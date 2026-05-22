@@ -23,9 +23,9 @@
         type="password" required
         placeholder="Contraseña"
       />
+      <p v-if="error" :class="error">{{ error }}</p>
       <input id="webbuttonprimarydefa" type="submit" value="Iniciar sesión" />
     </form>
-    <p v-if="error" :class="error">{{ error }}</p>
   </div>
 </template>
 
