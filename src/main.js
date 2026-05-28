@@ -1,15 +1,23 @@
+/**
+ * main.js — Punto de entrada de la aplicación Vue 3.
+ *
+ * Correcciones aplicadas:
+ *  - Se usa 'app' (instancia) en lugar de 'App' (componente) para
+ *    registrar propiedades globales
+ *  - El token ya no se configura aquí; lo maneja api/index.js con interceptors
+ */
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import store from './store'
-import axios from 'axios'
+import api from './api'
 
-axios.defaults.baseURL = 'http://127.0.0.1:8000/api/' // Set your API base URL here
-const token = localStorage.getItem('access_token')
-if (token) {
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-}
+const app = createApp(App)
 
-createApp(App).use(store).use(router).mount('#app')
+// Registrar la instancia de axios en propiedades globales
+// (accesible como this.$api en Options API)
+app.config.globalProperties.$api = api
 
-App.config.globalProperties.$axios = axios
+app.use(store)
+app.use(router)
+app.mount('#app')

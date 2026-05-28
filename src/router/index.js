@@ -1,43 +1,75 @@
+/**
+ * router/index.js
+ *
+ * Navigation guards:
+ *  - Rutas privadas redirigen a '/' si no hay sesión activa
+ *  - Rutas con `role` requerido redirigen al dashboard si el rol no coincide
+ */
 import { createRouter, createWebHistory } from 'vue-router'
+import store from '../store'
+import { ROLE_NAMES } from '../store'
 import HomeView from '../views/HomeView.vue'
 
 const routes = [
   {
     path: '/',
     name: 'home',
-    component: HomeView
+    component: HomeView,
+    meta: { public: true },
   },
   {
-    path: '/about',
-    name: 'about',
-    // route level code-splitting
-    // this generates a separate chunk (about.[hash].js) for this route
-    // which is lazy-loaded when the route is visited.
-    component: () => import(/* webpackChunkName: "about" */ '../views/AboutView.vue')
-  },
-  {
-
     path: '/dashboard',
     name: 'dashboard',
-    component: () => import(/* webpackChunkName: "dashboard" */ '../views/DashboardView.vue')
+    component: () => import('../views/DashboardView.vue'),
+    meta: { requiresAuth: true },
   },
   {
-
     path: '/inventario',
     name: 'inventario',
-    component: () => import(/* webpackChunkName: "inventario" */ '../views/InventarioView.vue')
+    component: () => import('../views/InventarioView.vue'),
+    meta: { requiresAuth: true },
   },
   {
-
     path: '/experimento',
     name: 'experimento',
-    component: () => import(/* webpackChunkName: "experimento" */ '../views/ExperimentoView.vue')
-  }
+    component: () => import('../views/ExperimentoView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/usuarios',
+    name: 'usuarios',
+    component: () => import('../views/UsuariosView.vue'),
+    // Solo Administrador puede gestionar usuarios
+    meta: { requiresAuth: true, requiredRole: ROLE_NAMES.ADMINISTRADOR },
+  },
 ]
 
 const router = createRouter({
   history: createWebHistory(process.env.BASE_URL),
-  routes
+  routes,
+})
+
+// ── Navigation Guard Global ────────────────────────────────────────────────
+router.beforeEach((to, from, next) => {
+  const isAuthenticated = store.getters.isAuthenticated
+  const userRole = (store.getters.userRole || '').toLowerCase()
+
+  // 1. Ruta pública (login): si ya hay sesión, ir al dashboard
+  if (to.meta.public && isAuthenticated) {
+    return next({ name: 'dashboard' })
+  }
+
+  // 2. Ruta privada sin sesión: redirigir al login
+  if (to.meta.requiresAuth && !isAuthenticated) {
+    return next({ name: 'home' })
+  }
+
+  // 3. Ruta con rol requerido: verificar por nombre de rol
+  if (to.meta.requiredRole && userRole !== to.meta.requiredRole) {
+    return next({ name: 'dashboard' })
+  }
+
+  next()
 })
 
 export default router
