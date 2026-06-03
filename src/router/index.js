@@ -1,10 +1,3 @@
-/**
- * router/index.js
- *
- * Navigation guards:
- *  - Rutas privadas redirigen a '/' si no hay sesión activa
- *  - Rutas con `role` requerido redirigen al dashboard si el rol no coincide
- */
 import { createRouter, createWebHistory } from 'vue-router'
 import store from '../store'
 import { ROLE_NAMES } from '../store'
@@ -33,6 +26,12 @@ const routes = [
     path: '/experimento',
     name: 'experimento',
     component: () => import('../views/ExperimentoView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/catalogos',
+    name: 'catalogos',
+    component: () => import('../views/CatalogosView.vue'),
     meta: { requiresAuth: true },
   },
   {

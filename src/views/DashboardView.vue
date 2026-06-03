@@ -18,11 +18,18 @@
           <div class="card-desc">Inventario de cajas y ratas</div>
         </router-link>
 
-        <!-- Experimentos: todos los roles pueden ver, pero Practicante solo lectura -->
+        <!-- Experimentos: todos los roles -->
         <router-link class="dash-card" to="/experimento">
           <div class="card-icon">📋</div>
           <div class="card-label">Experimentos</div>
           <div class="card-desc">Bitácora de experimentos</div>
+        </router-link>
+
+        <!-- Catálogos: todos los roles (Practicante solo lectura) -->
+        <router-link class="dash-card" to="/catalogos">
+          <div class="card-icon">📚</div>
+          <div class="card-label">Catálogos</div>
+          <div class="card-desc">Anestésicos, tejidos y condiciones</div>
         </router-link>
 
         <!-- Usuarios: solo Administrador -->

@@ -11,6 +11,7 @@
       <router-link to="/dashboard">Inicio</router-link>
       <router-link to="/inventario">Inventario</router-link>
       <router-link to="/experimento">Experimentos</router-link>
+      <router-link to="/catalogos">Catálogos</router-link>
       <router-link v-if="isAdmin" to="/usuarios">Usuarios</router-link>
     </div>
 
