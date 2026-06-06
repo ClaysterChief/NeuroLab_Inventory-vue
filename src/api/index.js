@@ -12,7 +12,7 @@
  */
 import axios from 'axios'
 
-const BASE_URL = process.env.VUE_APP_API_URL || 'http://127.0.0.1:8000/api/'
+const BASE_URL = process.env.VUE_APP_API_URL || `http://${window.location.hostname}:8000/api/`
 
 const api = axios.create({
   baseURL: BASE_URL,
