@@ -7,16 +7,16 @@
       <div class="page-header">
         <h1>Inventario de Cajas</h1>
         <div style="display:flex;gap:8px">
-          <button class="btn-outline" @click="descargarPDF('inventario')" title="Descargar PDF">
-            ⬇ PDF Inventario
-          </button>
+          <button class="btn-outline" @click="descargarReporte('inventario', 'pdf')">⬇ PDF</button>
+          <button class="btn-outline" @click="descargarReporte('inventario', 'excel')">⬇ Excel</button>
           <button v-if="isEncargado" class="btn-primary" @click="abrirModalCaja()">+ Nueva caja</button>
         </div>
       </div>
 
       <div class="filters-bar">
+        <!-- Cajas -->
         <input v-model="busquedaCaja" type="text" placeholder="Buscar por comentarios…" class="search-input"
-          @input="cajasPage = 1; fetchCajas()" />
+          @input="cajasPage = 1; fetchCajasDebounced()" />
         <select v-model="filtroSexoCaja" class="filter-select" @change="cajasPage = 1; fetchCajas()">
           <option value="">Todos los sexos</option>
           <option value="Macho">Macho</option>
@@ -78,20 +78,21 @@
       </div>
 
       <div class="filters-bar">
-        <input v-model="busquedaRata" type="text" placeholder="Buscar por número de cola…" class="search-input"
-          @input="ratasPage = 1; fetchRatas()" />
-        <select v-model="filtroSexoRata" class="filter-select" @change="ratasPage = 1; fetchRatas()">
-          <option value="">Todos los sexos</option>
-          <option value="Macho">Macho</option>
-          <option value="Hembra">Hembra</option>
-        </select>
-        <select v-model="filtroCaja" class="filter-select" @change="ratasPage = 1; fetchRatas()">
-          <option value="">Todas las cajas</option>
-          <option v-for="c in cajas" :key="c.idcaja" :value="c.idcaja">
-            Caja #{{ c.idcaja }} ({{ c.sexo }})
-          </option>
-        </select>
-        <button class="btn-secondary" @click="limpiarRatas">Limpiar</button>
+        <<!-- Ratas -->
+          <input v-model="busquedaRata" type="text" placeholder="Buscar por número de cola…" class="search-input"
+            @input="ratasPage = 1; fetchRatasDebounced()" />
+          <select v-model="filtroSexoRata" class="filter-select" @change="ratasPage = 1; fetchRatas()">
+            <option value="">Todos los sexos</option>
+            <option value="Macho">Macho</option>
+            <option value="Hembra">Hembra</option>
+          </select>
+          <select v-model="filtroCaja" class="filter-select" @change="ratasPage = 1; fetchRatas()">
+            <option value="">Todas las cajas</option>
+            <option v-for="c in cajas" :key="c.idcaja" :value="c.idcaja">
+              Caja #{{ c.idcaja }} ({{ c.sexo }})
+            </option>
+          </select>
+          <button class="btn-secondary" @click="limpiarRatas">Limpiar</button>
       </div>
 
       <div class="table-card">
@@ -130,7 +131,6 @@
             </tr>
           </tbody>
         </table>
-        <!-- Paginación Ratas — va dentro del div.table-card de ratas -->
         <div v-if="ratasTotalPages > 1" class="pagination-bar">
           <button :disabled="ratasPage === 1" @click="ratasPage--; fetchRatas()">← Anterior</button>
           <span>Página {{ ratasPage }} de {{ ratasTotalPages }} · {{ ratasTotal }} registros</span>
@@ -288,6 +288,7 @@
 import Navbar from '../components/Navbar.vue'
 import api from '../api'
 import { mapGetters } from 'vuex'
+import { debounce } from '../utils/debounce'
 
 export default {
   name: 'InventarioView',
@@ -328,7 +329,13 @@ export default {
     },
   },
   async created() {
-    await Promise.all([this.fetchCajas(), this.fetchRatas(), this.fetchCondiciones(), this.fetchUsuarios(), this.fetchCajasDropdown()])
+    this.fetchCajasDebounced = debounce(this.fetchCajas, 300)
+    this.fetchRatasDebounced = debounce(this.fetchRatas, 300)
+    await Promise.all([
+      this.fetchCajas(), this.fetchRatas(),
+      this.fetchCondiciones(), this.fetchUsuarios(),
+      this.fetchCajasDropdown(),
+    ])
   },
   methods: {
     // ── Cajas ─────────────────────────────────────────────────
@@ -372,14 +379,25 @@ export default {
         else await api.post('cajas/', this.formCaja)
         this.modalCaja = false
         await this.fetchCajas()
+        this.$toast.success(this.editandoCaja ? 'Caja actualizada.' : 'Caja registrada.')
       } catch (err) {
         this.errorModal = this._parseError(err, 'Error al guardar la caja.')
       } finally { this.saving = false }
     },
+
     async eliminarCaja(c) {
-      if (!confirm(`¿Eliminar la caja #${c.idcaja}?`)) return
-      try { await api.delete(`cajas/${c.idcaja}/`); await this.fetchCajas() }
-      catch { alert('No se pudo eliminar la caja.') }
+      const ok = await this.$confirm(
+        `¿Eliminar la caja #${c.idcaja}? Esta acción no se puede deshacer.`,
+        'Eliminar caja'
+      )
+      if (!ok) return
+      try {
+        await api.delete(`cajas/${c.idcaja}/`)
+        await this.fetchCajas()
+        this.$toast.success('Caja eliminada.')
+      } catch {
+        this.$toast.error('No se pudo eliminar la caja.')
+      }
     },
 
     // ── Ratas ──────────────────────────────────────────────────
@@ -453,32 +471,21 @@ export default {
     async guardarRata() {
       this.saving = true; this.errorModal = null; this.errorIdRata = null
       try {
-        const payload = {
-          sexo: this.formRata.sexo,
-          numerocola: this.formRata.numerocola,
-        }
-        // idrata: enviar solo si se especificó manualmente
+        const payload = { sexo: this.formRata.sexo, numerocola: this.formRata.numerocola }
         if (this.formRata.idrata) payload.idrata = this.formRata.idrata
-        // Opcionales: solo incluir si tienen valor
         if (this.formRata.idcaja) payload.idcaja = this.formRata.idcaja
         if (this.formRata.idcondicion) payload.idcondicion = this.formRata.idcondicion
         if (this.formRata.pesosemanal) payload.pesosemanal = this.formRata.pesosemanal
         if (this.formRata.fechacirugia) payload.fechacirugia = this.formRata.fechacirugia
-
-        if (this.editandoRata) {
-          // Usar id (PK interna) para la URL, no idrata
-          await api.put(`ratas/${this.formRata.id}/`, payload)
-        } else {
-          await api.post('ratas/', payload)
-        }
+        if (this.editandoRata) await api.put(`ratas/${this.formRata.id}/`, payload)
+        else await api.post('ratas/', payload)
         this.modalRata = false
         await this.fetchRatas()
+        this.$toast.success(this.editandoRata ? 'Rata actualizada.' : 'Rata registrada.')
       } catch (err) {
         const data = err.response?.data
         if (data?.idrata) {
           this.errorIdRata = Array.isArray(data.idrata) ? data.idrata[0] : data.idrata
-        } else if (data?.fechacirugia) {
-          this.errorModal = Array.isArray(data.fechacirugia) ? data.fechacirugia[0] : data.fechacirugia
         } else {
           this.errorModal = this._parseError(err, 'Error al guardar la rata.')
         }
@@ -486,12 +493,18 @@ export default {
     },
 
     async eliminarRata(r) {
-      if (!confirm(`¿Eliminar la rata ${r.sexo[0]}-${r.idrata}?`)) return
+      const ok = await this.$confirm(
+        `¿Eliminar la rata ${r.sexo[0]}-${r.idrata}?`,
+        'Eliminar rata'
+      )
+      if (!ok) return
       try {
-        // Usar id (PK interna) para la URL
         await api.delete(`ratas/${r.id}/`)
         await this.fetchRatas()
-      } catch { alert('No se pudo eliminar la rata.') }
+        this.$toast.success('Rata eliminada.')
+      } catch {
+        this.$toast.error('No se pudo eliminar la rata.')
+      }
     },
 
     // ── Helpers ────────────────────────────────────────────────
@@ -542,19 +555,27 @@ export default {
 
       return fallback
     },
-    async descargarPDF(tipo) {
+    async descargarReporte(tipo, formato) {
+      const mimes = {
+        pdf: 'application/pdf',
+        excel: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }
+      const exts = { pdf: 'pdf', excel: 'xlsx' }
       try {
-        const res = await api.get(`reportes/${tipo}/`, { responseType: 'blob' })
-        const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+        const url = formato === 'excel'
+          ? `reportes/${tipo}/excel/`
+          : `reportes/${tipo}/`
+        const res = await api.get(url, { responseType: 'blob' })
         const link = document.createElement('a')
-        link.href = url
-        link.setAttribute('download', `${tipo}_neurolab.pdf`)
+        link.href = window.URL.createObjectURL(new Blob([res.data], { type: mimes[formato] }))
+        link.setAttribute('download', `${tipo}_neurolab.${exts[formato]}`)
         document.body.appendChild(link)
         link.click()
         link.remove()
-        window.URL.revokeObjectURL(url)
+        window.URL.revokeObjectURL(link.href)
+        this.$toast.success(`Reporte ${formato.toUpperCase()} descargado.`)
       } catch {
-        alert('No se pudo generar el reporte PDF.')
+        this.$toast.error('No se pudo generar el reporte.')
       }
     },
   },
@@ -562,364 +583,9 @@ export default {
 </script>
 
 <style scoped>
-.page-wrapper {
-  min-height: 100vh;
-  background: #f4f4f8;
-}
-
 .content {
   max-width: 1100px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
 }
-
-.section-divider {
-  height: 2px;
-  background: #e8e8ee;
-  margin: 2.5rem 0;
-  border-radius: 2px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.1rem;
-}
-
-.page-header h1 {
-  font-size: 1.4rem;
-  font-weight: 600;
-  color: #1a1a2e;
-  margin: 0;
-}
-
-.filters-bar {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 1.1rem;
-  flex-wrap: wrap;
-}
-
-.search-input {
-  flex: 1;
-  min-width: 160px;
-  padding: .55rem .9rem;
-  border: 1.5px solid #ddd;
-  border-radius: 8px;
-  font-size: .9rem;
-  outline: none;
-}
-
-.search-input:focus {
-  border-color: #80201d;
-}
-
-.filter-select {
-  padding: .55rem .8rem;
-  border: 1.5px solid #ddd;
-  border-radius: 8px;
-  font-size: .9rem;
-  background: #fff;
-  outline: none;
-}
-
-.table-card {
-  background: #fff;
-  border-radius: 12px;
-  border: 1px solid #e0e0e0;
-  overflow: hidden;
-  margin-bottom: 1rem;
-  overflow-x: auto;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: .87rem;
-}
-
-.data-table th {
-  background: #f8f8fb;
-  padding: .65rem 1rem;
-  text-align: left;
-  font-size: .77rem;
-  font-weight: 600;
-  color: #666;
-  border-bottom: 1px solid #e0e0e0;
-  white-space: nowrap;
-}
-
-.data-table td {
-  padding: .6rem 1rem;
-  border-bottom: 1px solid #f0f0f0;
-  color: #333;
-}
-
-.data-table tr:last-child td {
-  border-bottom: none;
-}
-
-.td-clip {
-  max-width: 160px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.empty-row {
-  text-align: center;
-  color: #aaa;
-  padding: 2rem !important;
-}
-
-.actions {
-  display: flex;
-  gap: 4px;
-}
-
-.badge {
-  display: inline-block;
-  font-size: .75rem;
-  padding: 2px 10px;
-  border-radius: 99px;
-  font-weight: 500;
-}
-
-.badge-blue {
-  background: #e3f2fd;
-  color: #1565c0;
-}
-
-.badge-pink {
-  background: #fce4ec;
-  color: #c62828;
-}
-
-.badge-purple {
-  background: #f3e5f5;
-  color: #6a0dad;
-}
-
-.state-msg {
-  padding: 2rem;
-  text-align: center;
-  color: #888;
-}
-
-.state-msg.error {
-  color: #c62828;
-}
-
-.btn-primary {
-  background: #80201d;
-  color: #fff;
-  border: none;
-  padding: .55rem 1.2rem;
-  border-radius: 8px;
-  font-size: .9rem;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #9e2a26;
-}
-
-.btn-primary:disabled {
-  opacity: .6;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: transparent;
-  border: 1.5px solid #ccc;
-  color: #555;
-  padding: .55rem 1.2rem;
-  border-radius: 8px;
-  font-size: .9rem;
-  cursor: pointer;
-}
-
-.btn-secondary:hover {
-  background: #f5f5f5;
-}
-
-.btn-icon {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 1rem;
-  padding: 4px 6px;
-  border-radius: 6px;
-}
-
-.btn-icon:hover {
-  background: #f0f0f0;
-}
-
-.btn-icon.danger:hover {
-  background: #ffebee;
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, .45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-  padding: 1rem;
-}
-
-.modal {
-  background: #fff;
-  border-radius: 14px;
-  padding: 2rem;
-  width: 100%;
-  max-width: 500px;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal h2 {
-  font-size: 1.15rem;
-  font-weight: 600;
-  margin: 0 0 1.5rem 0;
-  color: #1a1a2e;
-}
-
-.fields-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.field-full {
-  grid-column: 1 / -1;
-}
-
-.field label {
-  font-size: .82rem;
-  font-weight: 500;
-  color: #555;
-}
-
-.field input,
-.field select,
-.field textarea {
-  padding: .55rem .8rem;
-  border: 1.5px solid #ddd;
-  border-radius: 8px;
-  font-size: .9rem;
-  outline: none;
-  font-family: inherit;
-  resize: vertical;
-}
-
-.field input:focus,
-.field select:focus {
-  border-color: #80201d;
-}
-
-.input-error {
-  border-color: #c62828 !important;
-  background: #fff8f8;
-}
-
-.field-error {
-  color: #c62828;
-  font-size: .78rem;
-}
-
-.field-hint {
-  color: #aaa;
-  font-size: .76rem;
-}
-
-.label-hint {
-  font-size: .75rem;
-  color: #80201d;
-  font-weight: 400;
-  margin-left: 6px;
-}
-
-.req {
-  color: #c62828;
-}
-
-.id-row {
-  display: flex;
-  gap: 6px;
-}
-
-.id-row input {
-  flex: 1;
-}
-
-.btn-auto {
-  padding: .4rem .8rem;
-  background: #f0e8e8;
-  color: #80201d;
-  border: 1.5px solid #d4a0a0;
-  border-radius: 7px;
-  font-size: .8rem;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.btn-auto:hover {
-  background: #e8d0d0;
-}
-
-.form-error {
-  color: #c62828;
-  font-size: .82rem;
-  background: #ffebee;
-  padding: .5rem;
-  border-radius: 6px;
-  margin-top: .75rem;
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 1.5rem;
-}
-
-.btn-outline {
-  background: transparent;
-  border: 1.5px solid #80201d;
-  color: #80201d;
-  padding: .55rem 1.2rem;
-  border-radius: 8px;
-  font-size: .9rem;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.btn-outline:hover {
-  background: #fff0f0;
-}
-
-.pagination-bar {
-  display: flex; align-items: center; justify-content: center;
-  gap: 14px; padding: .7rem 1rem; font-size: .83rem;
-  color: #888; border-top: .5px solid #f0f0f0;
-}
-.pagination-bar button {
-  background: transparent; border: 1.5px solid #ddd;
-  border-radius: 6px; padding: 3px 12px; font-size: .82rem; cursor: pointer;
-}
-.pagination-bar button:disabled { opacity: .35; cursor: not-allowed; }
-.pagination-bar button:hover:not(:disabled) { border-color: #80201d; color: #80201d; }
 </style>

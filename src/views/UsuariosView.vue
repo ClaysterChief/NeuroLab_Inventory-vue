@@ -223,37 +223,27 @@ export default {
     },
 
     async guardarUsuario() {
-      this.saving = true
-      this.formError = null
-      this.fieldErrors = {}
-
-      // Validación local de contraseñas
+      this.saving = true; this.formError = null; this.fieldErrors = {}
       if (this.form.password && this.form.password !== this.form.password_confirm) {
         this.fieldErrors.password_confirm = 'Las contraseñas no coinciden.'
-        this.saving = false
-        return
+        this.saving = false; return
       }
-
       try {
         const payload = {
           nombreusuario: this.form.nombreusuario,
           apellidopaterno: this.form.apellidopaterno,
           apellidomaterno: this.form.apellidomaterno,
-          sexo: this.form.sexo,
-          idrol: this.form.idrol,
+          sexo: this.form.sexo, idrol: this.form.idrol,
         }
         if (this.form.password) {
           payload.password = this.form.password
           payload.password_confirm = this.form.password_confirm
         }
-
-        if (this.editando) {
-          await api.put(`usuarios/${this.form.idusuario}/`, payload)
-        } else {
-          await api.post('usuarios/', payload)
-        }
+        if (this.editando) await api.put(`usuarios/${this.form.idusuario}/`, payload)
+        else await api.post('usuarios/', payload)
         this.closeModal()
         await this.fetchUsuarios()
+        this.$toast.success(this.editando ? 'Usuario actualizado.' : 'Usuario creado.')
       } catch (err) {
         const data = err.response?.data
         if (data && typeof data === 'object') {
@@ -266,18 +256,21 @@ export default {
         } else {
           this.formError = 'Error al guardar. Verifica los datos.'
         }
-      } finally {
-        this.saving = false
-      }
+      } finally { this.saving = false }
     },
 
     async confirmDelete(u) {
-      if (!confirm(`¿Eliminar al usuario "${u.nombreusuario}"?\nEsta acción no se puede deshacer.`)) return
+      const ok = await this.$confirm(
+        `¿Eliminar al usuario "${u.nombreusuario}"? Esta acción no se puede deshacer.`,
+        'Eliminar usuario'
+      )
+      if (!ok) return
       try {
         await api.delete(`usuarios/${u.idusuario}/`)
         await this.fetchUsuarios()
+        this.$toast.success('Usuario eliminado.')
       } catch {
-        alert('No se pudo eliminar el usuario.')
+        this.$toast.error('No se pudo eliminar el usuario.')
       }
     },
   },
@@ -285,251 +278,9 @@ export default {
 </script>
 
 <style scoped>
-.page-wrapper {
-  min-height: 100vh;
-  background: #f4f4f8;
-}
-
 .content {
   max-width: 1000px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
 }
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.page-header h1 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #1a1a2e;
-  margin: 0;
-}
-
-.table-card {
-  background: #fff;
-  border-radius: 12px;
-  border: 1px solid #e0e0e0;
-  overflow: hidden;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: .9rem;
-}
-
-.data-table th {
-  background: #f8f8fb;
-  padding: .75rem 1rem;
-  text-align: left;
-  font-size: .8rem;
-  font-weight: 600;
-  color: #666;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.data-table td {
-  padding: .7rem 1rem;
-  border-bottom: 1px solid #f0f0f0;
-  color: #333;
-}
-
-.data-table tr:last-child td {
-  border-bottom: none;
-}
-
-.empty-row {
-  text-align: center;
-  color: #aaa;
-  padding: 2rem !important;
-}
-
-.actions {
-  display: flex;
-  gap: 6px;
-}
-
-.role-chip {
-  background: #f3e5f5;
-  color: #6a0dad;
-  font-size: .78rem;
-  padding: 2px 8px;
-  border-radius: 99px;
-}
-
-.state-msg {
-  padding: 2rem;
-  text-align: center;
-  color: #888;
-}
-
-.state-msg.error {
-  color: #c62828;
-}
-
-.btn-primary {
-  background: #80201d;
-  color: #fff;
-  border: none;
-  padding: .55rem 1.2rem;
-  border-radius: 8px;
-  font-size: .9rem;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #9e2a26;
-}
-
-.btn-primary:disabled {
-  opacity: .6;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: transparent;
-  border: 1.5px solid #ccc;
-  color: #555;
-  padding: .55rem 1.2rem;
-  border-radius: 8px;
-  font-size: .9rem;
-  cursor: pointer;
-}
-
-.btn-icon {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 1rem;
-  padding: 4px 6px;
-  border-radius: 6px;
-}
-
-.btn-icon:hover {
-  background: #f0f0f0;
-}
-
-.btn-icon.danger:hover {
-  background: #ffebee;
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, .45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-}
-
-.modal {
-  background: #fff;
-  border-radius: 14px;
-  padding: 2rem;
-  width: 100%;
-  max-width: 540px;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal h2 {
-  font-size: 1.2rem;
-  font-weight: 600;
-  margin: 0 0 1.5rem 0;
-  color: #1a1a2e;
-}
-
-.fields-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.field label {
-  font-size: .82rem;
-  font-weight: 500;
-  color: #555;
-}
-
-.field input,
-.field select {
-  padding: .55rem .8rem;
-  border: 1.5px solid #ddd;
-  border-radius: 8px;
-  font-size: .9rem;
-  outline: none;
-}
-
-.field input:focus,
-.field select:focus {
-  border-color: #80201d;
-}
-
-.field input:disabled {
-  background: #f5f5f5;
-  cursor: not-allowed;
-}
-
-.input-error {
-  border-color: #c62828 !important;
-  background: #fff8f8;
-}
-
-.field-error {
-  color: #c62828;
-  font-size: .78rem;
-  margin-top: 2px;
-}
-
-.label-hint {
-  font-size: .75rem;
-  color: #999;
-  font-weight: 400;
-  margin-left: 4px;
-}
-
-.req {
-  color: #c62828;
-}
-
-.form-error {
-  color: #c62828;
-  font-size: .82rem;
-  background: #ffebee;
-  padding: .5rem;
-  border-radius: 6px;
-  margin-top: .5rem;
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 1.5rem;
-}
-
-.pagination-bar {
-  display: flex; align-items: center; justify-content: center;
-  gap: 14px; padding: .7rem 1rem; font-size: .83rem;
-  color: #888; border-top: .5px solid #f0f0f0;
-}
-.pagination-bar button {
-  background: transparent; border: 1.5px solid #ddd;
-  border-radius: 6px; padding: 3px 12px; font-size: .82rem; cursor: pointer;
-}
-.pagination-bar button:disabled { opacity: .35; cursor: not-allowed; }
-.pagination-bar button:hover:not(:disabled) { border-color: #80201d; color: #80201d; }
 </style>

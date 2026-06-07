@@ -7,19 +7,16 @@
       <div class="page-header">
         <h1>Bitácora de Experimentos</h1>
         <div style="display:flex;gap:8px">
-          <button class="btn-outline" @click="descargarPDF" title="Descargar PDF">
-            ⬇ PDF Bitácora
-          </button>
-          <button v-if="isEncargado" class="btn-primary" @click="abrirModal()">
-            + Nuevo registro
-          </button>
+          <button class="btn-outline" @click="descargarReporte('pdf')">⬇ PDF</button>
+          <button class="btn-outline" @click="descargarReporte('excel')">⬇ Excel</button>
+          <button v-if="isEncargado" class="btn-primary" @click="abrirModal()">+ Nuevo registro</button>
         </div>
       </div>
 
       <!-- ── Filtros ───────────────────────────────────────── -->
       <div class="filters-bar">
         <input v-model="busqueda" type="text" placeholder="Buscar por actividad, notas o responsable…"
-          class="search-input" @input="bitacoraPage = 1; fetchBitacora()" />
+          class="search-input" @input="bitacoraPage = 1; this.fetchBitacoraDebounced()" />
         <select v-model="filtroAnestesico" class="filter-select" @change="bitacoraPage = 1; fetchBitacora()">
           <option value="">Todos los anestésicos</option>
           <option v-for="a in anestesicos" :key="a.idanestesico" :value="a.idanestesico">
@@ -177,6 +174,7 @@
 import Navbar from '../components/Navbar.vue'
 import api from '../api'
 import { mapGetters } from 'vuex'
+import { debounce } from '../utils/debounce'
 
 const FORM_VACIO = () => ({
   idrata: '', fechacirujia: '', pesoexperimento: '',
@@ -226,10 +224,8 @@ export default {
   },
 
   async created() {
-    await Promise.all([
-      this.fetchBitacora(),
-      this.fetchCatalogos(),
-    ])
+    this.fetchBitacoraDebounced = debounce(this.fetchBitacora, 300)
+    await Promise.all([this.fetchBitacora(), this.fetchCatalogos()])
   },
 
   methods: {
@@ -305,40 +301,38 @@ export default {
     },
 
     async guardar() {
-      this.saving = true
-      this.errorModal = null
+      this.saving = true; this.errorModal = null
       try {
-        // Limpiar campos vacíos opcionales para no enviar strings vacíos
         const payload = { ...this.form }
         if (!payload.idtejido) delete payload.idtejido
         if (!payload.pesoexperimento) delete payload.pesoexperimento
         if (!payload.dosis) delete payload.dosis
         if (!payload.dosistotal) delete payload.dosistotal
-
-        if (this.editando) {
-          await api.put(`bitacora/${payload.idbitacora}/`, payload)
-        } else {
-          await api.post('bitacora/', payload)
-        }
+        if (this.editando) await api.put(`bitacora/${payload.idbitacora}/`, payload)
+        else await api.post('bitacora/', payload)
         this.showModal = false
         await this.fetchBitacora()
+        this.$toast.success(this.editando ? 'Registro actualizado.' : 'Experimento registrado.')
       } catch (err) {
         const data = err.response?.data
         this.errorModal = data
           ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(' | ')
           : 'Error al guardar el registro.'
-      } finally {
-        this.saving = false
-      }
+      } finally { this.saving = false }
     },
 
     async eliminar(registro) {
-      if (!confirm(`¿Eliminar el registro #${registro.idbitacora}? Esta acción no se puede deshacer.`)) return
+      const ok = await this.$confirm(
+        `¿Eliminar el registro #${registro.idbitacora}? Esta acción no se puede deshacer.`,
+        'Eliminar registro'
+      )
+      if (!ok) return
       try {
         await api.delete(`bitacora/${registro.idbitacora}/`)
         await this.fetchBitacora()
+        this.$toast.success('Registro eliminado.')
       } catch {
-        alert('No se pudo eliminar el registro.')
+        this.$toast.error('No se pudo eliminar el registro.')
       }
     },
 
@@ -348,19 +342,25 @@ export default {
       return `${day}/${m}/${y}`
     },
 
-    async descargarPDF() {
+    async descargarReporte(formato) {
+      const mimes = {
+        pdf: 'application/pdf',
+        excel: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }
+      const exts = { pdf: 'pdf', excel: 'xlsx' }
       try {
-        const res = await api.get('reportes/bitacora/', { responseType: 'blob' })
-        const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+        const url = formato === 'excel' ? 'reportes/bitacora/excel/' : 'reportes/bitacora/'
+        const res = await api.get(url, { responseType: 'blob' })
         const link = document.createElement('a')
-        link.href = url
-        link.setAttribute('download', 'bitacora_neurolab.pdf')
+        link.href = window.URL.createObjectURL(new Blob([res.data], { type: mimes[formato] }))
+        link.setAttribute('download', `bitacora_neurolab.${exts[formato]}`)
         document.body.appendChild(link)
         link.click()
         link.remove()
-        window.URL.revokeObjectURL(url)
+        window.URL.revokeObjectURL(link.href)
+        this.$toast.success(`Reporte ${formato.toUpperCase()} descargado.`)
       } catch {
-        alert('No se pudo generar el reporte PDF.')
+        this.$toast.error('No se pudo generar el reporte.')
       }
     },
   },
@@ -368,94 +368,10 @@ export default {
 </script>
 
 <style scoped>
-.page-wrapper {
-  min-height: 100vh;
-  background: #f4f4f8;
-}
-
 .content {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.25rem;
-}
-
-.page-header h1 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #1a1a2e;
-  margin: 0;
-}
-
-.filters-bar {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 1.25rem;
-  flex-wrap: wrap;
-}
-
-.search-input {
-  flex: 1;
-  min-width: 200px;
-  padding: 0.55rem 0.9rem;
-  border: 1.5px solid #ddd;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  outline: none;
-}
-
-.search-input:focus {
-  border-color: #80201d;
-}
-
-.filter-select {
-  padding: 0.55rem 0.8rem;
-  border: 1.5px solid #ddd;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  background: #fff;
-  outline: none;
-}
-
-.table-card {
-  background: #fff;
-  border-radius: 12px;
-  border: 1px solid #e0e0e0;
-  overflow: hidden;
-  overflow-x: auto;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.87rem;
-}
-
-.data-table th {
-  background: #f8f8fb;
-  padding: 0.7rem 0.9rem;
-  text-align: left;
-  font-size: 0.77rem;
-  font-weight: 600;
-  color: #666;
-  border-bottom: 1px solid #e0e0e0;
-  white-space: nowrap;
-}
-
-.data-table td {
-  padding: 0.65rem 0.9rem;
-  border-bottom: 1px solid #f0f0f0;
-  color: #333;
-}
-
-.data-table tr:last-child td {
-  border-bottom: none;
 }
 
 .td-actividad {
@@ -464,237 +380,4 @@ export default {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.empty-row {
-  text-align: center;
-  color: #aaa;
-  padding: 2rem !important;
-}
-
-.actions {
-  display: flex;
-  gap: 4px;
-}
-
-.badge {
-  display: inline-block;
-  font-size: 0.75rem;
-  padding: 2px 8px;
-  border-radius: 99px;
-  font-weight: 500;
-}
-
-.badge-blue {
-  background: #e3f2fd;
-  color: #1565c0;
-}
-
-.state-msg {
-  padding: 2rem;
-  text-align: center;
-  color: #888;
-}
-
-.state-msg.error {
-  color: #c62828;
-}
-
-.btn-primary {
-  background: #80201d;
-  color: #fff;
-  border: none;
-  padding: 0.55rem 1.2rem;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #9e2a26;
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: transparent;
-  border: 1.5px solid #ccc;
-  color: #555;
-  padding: 0.55rem 1.2rem;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  cursor: pointer;
-}
-
-.btn-secondary:hover {
-  background: #f5f5f5;
-}
-
-.btn-icon {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 1rem;
-  padding: 4px 6px;
-  border-radius: 6px;
-}
-
-.btn-icon:hover {
-  background: #f0f0f0;
-}
-
-.btn-icon.danger:hover {
-  background: #ffebee;
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-  padding: 1rem;
-}
-
-.modal {
-  background: #fff;
-  border-radius: 14px;
-  padding: 2rem;
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-wide {
-  max-width: 660px;
-}
-
-.modal h2 {
-  font-size: 1.15rem;
-  font-weight: 600;
-  margin: 0 0 1.25rem 0;
-  color: #1a1a2e;
-}
-
-.section-label {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: #80201d;
-  text-transform: uppercase;
-  letter-spacing: .05em;
-  margin: 1.25rem 0 0.75rem;
-  border-bottom: 1px solid #f0e0e0;
-  padding-bottom: 4px;
-}
-
-.section-label:first-of-type {
-  margin-top: 0;
-}
-
-.fields-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.field-full {
-  grid-column: 1 / -1;
-}
-
-.field label {
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: #555;
-}
-
-.required {
-  color: #c62828;
-}
-
-.field input,
-.field select,
-.field textarea {
-  padding: 0.55rem 0.8rem;
-  border: 1.5px solid #ddd;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  outline: none;
-  font-family: inherit;
-  resize: vertical;
-}
-
-.field input:focus,
-.field select:focus,
-.field textarea:focus {
-  border-color: #80201d;
-}
-
-.input-readonly {
-  background: #f8f8f8;
-  color: #555;
-}
-
-.form-error {
-  color: #c62828;
-  font-size: 0.82rem;
-  background: #ffebee;
-  padding: 0.5rem;
-  border-radius: 6px;
-  margin-top: 0.75rem;
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 1.5rem;
-}
-
-@media (max-width: 600px) {
-  .fields-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .field-full {
-    grid-column: 1;
-  }
-}
-
-.btn-outline {
-  background: transparent;
-  border: 1.5px solid #80201d;
-  color: #80201d;
-  padding: .55rem 1.2rem;
-  border-radius: 8px;
-  font-size: .9rem;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.btn-outline:hover {
-  background: #fff0f0;
-}
-
-.pagination-bar {
-  display: flex; align-items: center; justify-content: center;
-  gap: 14px; padding: .7rem 1rem; font-size: .83rem;
-  color: #888; border-top: .5px solid #f0f0f0;
-}
-.pagination-bar button {
-  background: transparent; border: 1.5px solid #ddd;
-  border-radius: 6px; padding: 3px 12px; font-size: .82rem; cursor: pointer;
-}
-.pagination-bar button:disabled { opacity: .35; cursor: not-allowed; }
-.pagination-bar button:hover:not(:disabled) { border-color: #80201d; color: #80201d; }
 </style>
