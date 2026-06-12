@@ -327,6 +327,7 @@
     max-width: 480px;
     max-height: 90vh;
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .modal--wide {
@@ -354,7 +355,7 @@
     gap: 1rem;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 540px) {
     .fields-grid {
         grid-template-columns: 1fr;
     }

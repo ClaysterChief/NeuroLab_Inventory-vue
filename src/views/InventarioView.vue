@@ -22,6 +22,12 @@
           <option value="Macho">Macho</option>
           <option value="Hembra">Hembra</option>
         </select>
+        <select v-model="filtroUbicacion" class="filter-select" @change="cajasPage = 1; fetchCajas()">
+          <option value="">Todas las ubicaciones</option>
+          <option v-for="u in ubicaciones" :key="u.idubicacion" :value="u.idubicacion">
+            {{ u.nombreubicacion }}
+          </option>
+        </select>
         <button class="btn-secondary" @click="limpiarCajas">Limpiar</button>
       </div>
 
@@ -32,10 +38,11 @@
           <thead>
             <tr>
               <th>Caja #</th>
-              <th>Ratas totales</th>
+              <th>Ratas registradas</th>
               <th>Sexo</th>
               <th>F. Nacimiento</th>
               <th>Talla</th>
+              <th>Ubicación</th>
               <th>Responsable</th>
               <th>Comentarios</th>
               <th v-if="isEncargado">Acciones</th>
@@ -48,6 +55,7 @@
               <td><span class="badge" :class="c.sexo === 'Macho' ? 'badge-blue' : 'badge-pink'">{{ c.sexo }}</span></td>
               <td>{{ fmt(c.fechanacimiento) }}</td>
               <td>{{ c.talla || '—' }}</td>
+              <td>{{ c.ubicacion_nombre || '—' }}</td>
               <td>{{ c.responsable_nombre || '—' }}</td>
               <td class="td-clip">{{ c.comentarios || '—' }}</td>
               <td v-if="isEncargado" class="actions">
@@ -106,7 +114,7 @@
               <th>N° Cola</th>
               <th>Caja</th>
               <th>Condición</th>
-              <th>Peso semanal (g)</th>
+              <th>Último peso (g)</th>
               <th>F. Cirugía</th>
               <th v-if="isEncargado">Acciones</th>
             </tr>
@@ -119,9 +127,16 @@
               <td>{{ r.caja_info ? `Caja #${r.caja_info.idcaja}` : '—' }}</td>
               <td><span v-if="r.condicion_nombre" class="badge badge-purple">{{ r.condicion_nombre }}</span><span
                   v-else>—</span></td>
-              <td>{{ r.pesosemanal ?? '—' }}</td>
+              <td>
+                <span v-if="r.ultimo_peso">
+                  {{ r.ultimo_peso }}
+                  <span class="peso-fecha">{{ fmtShort(r.ultima_fecha_peso) }}</span>
+                </span>
+                <span v-else>—</span>
+              </td>
               <td>{{ fmt(r.fechacirugia) }}</td>
               <td v-if="isEncargado" class="actions">
+                <button class="btn-icon" @click="abrirPesos(r)" title="Historial de pesos">⚖️</button>
                 <button class="btn-icon" @click="abrirModalRata(r)" title="Editar">✏️</button>
                 <button v-if="isAdmin" class="btn-icon danger" @click="eliminarRata(r)" title="Eliminar">🗑️</button>
               </td>
@@ -145,10 +160,6 @@
           <form @submit.prevent="guardarCaja">
             <div class="fields-grid">
               <div class="field">
-                <label>Cantidad de ratas <span class="req">*</span></label>
-                <input v-model.number="formCaja.cantidadratas" type="number" min="1" required />
-              </div>
-              <div class="field">
                 <label>Sexo <span class="req">*</span></label>
                 <select v-model="formCaja.sexo" required>
                   <option value="">Seleccionar…</option>
@@ -167,6 +178,15 @@
                   <option value="Pequeña">Pequeña</option>
                   <option value="Mediana">Mediana</option>
                   <option value="Grande">Grande</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Ubicación</label>
+                <select v-model.number="formCaja.idubicacion">
+                  <option value="">Sin asignar</option>
+                  <option v-for="u in ubicaciones" :key="u.idubicacion" :value="u.idubicacion">
+                    {{ u.nombreubicacion }}
+                  </option>
                 </select>
               </div>
               <div class="field field-full">
@@ -257,12 +277,6 @@
                 </select>
               </div>
 
-              <!-- Peso semanal -->
-              <div class="field">
-                <label>Peso semanal (g)</label>
-                <input v-model.number="formRata.pesosemanal" type="number" step="0.1" />
-              </div>
-
               <!-- Fecha cirugía -->
               <div class="field field-full">
                 <label>Fecha de cirugía / protocolo</label>
@@ -279,7 +293,76 @@
           </form>
         </div>
       </div>
+      <!-- ══ MODAL HISTORIAL DE PESOS ══════════════════════════════ -->
+      <div v-if="modalPesos" class="modal-overlay" @click.self="modalPesos = false">
+        <div class="modal modal--wide">
+          <h2>
+            ⚖️ Historial de pesos —
+            <span v-if="rataSeleccionada">
+              {{ rataSeleccionada.sexo[0] }}-{{ rataSeleccionada.idrata }}
+              (Cola {{ rataSeleccionada.numerocola }})
+            </span>
+          </h2>
 
+          <!-- Formulario de nuevo peso -->
+          <div class="peso-form">
+            <div class="fields-grid">
+              <div class="field">
+                <label>Fecha <span class="req">*</span></label>
+                <input v-model="formPeso.fecha" type="date" />
+              </div>
+              <div class="field">
+                <label>Peso (g) <span class="req">*</span></label>
+                <input v-model.number="formPeso.peso" type="number" step="0.1" placeholder="320" />
+              </div>
+              <div class="field field-full">
+                <label>Notas</label>
+                <input v-model="formPeso.notas" type="text" placeholder="Observaciones opcionales…" />
+              </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:.75rem">
+              <button class="btn-primary" @click="registrarPeso">+ Registrar peso</button>
+            </div>
+          </div>
+
+          <!-- Historial -->
+          <div class="peso-historial">
+            <div v-if="loadingPesos" class="state-msg">Cargando historial…</div>
+            <table v-else-if="historialPesos.length" class="data-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Peso (g)</th>
+                  <th>Tendencia</th>
+                  <th>Notas</th>
+                  <th v-if="isAdmin">Eliminar</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(p, i) in historialPesos" :key="p.id">
+                  <td>{{ fmt(p.fecha) }}</td>
+                  <td><strong>{{ p.peso }}</strong></td>
+                  <td>
+                    <span :class="['tend', pesoTendencia(i) === '↑' ? 'tend-up'
+                      : pesoTendencia(i) === '↓' ? 'tend-down' : 'tend-eq']">
+                      {{ pesoTendencia(i) || '—' }}
+                    </span>
+                  </td>
+                  <td>{{ p.notas || '—' }}</td>
+                  <td v-if="isAdmin">
+                    <button class="btn-icon danger" @click="eliminarPeso(p)">🗑️</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-else class="state-msg">Sin registros de peso todavía.</div>
+          </div>
+
+          <div class="modal-actions">
+            <button class="btn-secondary" @click="modalPesos = false">Cerrar</button>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 </template>
@@ -306,7 +389,7 @@ export default {
       condiciones: [],
       modalRata: false, editandoRata: false,
       siguienteId: '—', errorIdRata: null,
-      formRata: { id: null, idrata: '', sexo: '', numerocola: '', idcaja: '', idcondicion: '', pesosemanal: '', fechacirugia: '' },
+      formRata: { id: null, idrata: '', sexo: '', numerocola: '', idcaja: '', idcondicion: '', fechacirugia: '' },
       // Compartido
       saving: false, errorModal: null,
       // Catálogos de apoyo
@@ -317,6 +400,14 @@ export default {
       ratasPage: 1, ratasTotalPages: 1, ratasTotal: 0,
       // Dropdown de cajas para el modal de ratas (sin paginar)
       cajasDropdown: [],
+      // Pesos semanales
+      modalPesos: false,
+      rataSeleccionada: null,
+      historialPesos: [],
+      loadingPesos: false,
+      formPeso: { fecha: '', peso: '', notas: '' },
+      ubicaciones: [],
+      filtroUbicacion: '',
     }
   },
   computed: {
@@ -335,6 +426,7 @@ export default {
       this.fetchCajas(), this.fetchRatas(),
       this.fetchCondiciones(), this.fetchUsuarios(),
       this.fetchCajasDropdown(),
+      this.fetchUbicaciones(),
     ])
   },
   methods: {
@@ -347,6 +439,7 @@ export default {
         if (this.busquedaCaja) params.search = this.busquedaCaja
         if (this.filtroSexoCaja) params.sexo = this.filtroSexoCaja
         const res = await api.get('cajas/', { params })
+        if (this.filtroUbicacion) params.idubicacion = this.filtroUbicacion
         this.cajas = res.data.results ?? res.data
         this.cajasTotalPages = res.data.total_pages ?? 1
         this.cajasTotal = res.data.count ?? this.cajas.length
@@ -359,19 +452,56 @@ export default {
         this.cajasDropdown = res.data.results ?? res.data
       } catch { /* no bloqueante */ }
     },
-    limpiarCajas() { this.busquedaCaja = ''; this.filtroSexoCaja = ''; this.cajasPage = 1; this.fetchCajas() },
+    limpiarCajas() {
+      this.busquedaCaja = ''; this.filtroSexoCaja = ''; this.filtroUbicacion = ''
+      this.cajasPage = 1
+      this.fetchCajas()
+    },
     abrirModalCaja(c = null) {
       this.errorModal = null
       this.editandoCaja = !!c
       this.formCaja = c
         ? {
-          idcaja: c.idcaja, cantidadratas: c.cantidadratas, sexo: c.sexo,
-          fechanacimiento: c.fechanacimiento, talla: c.talla || '',
-          comentarios: c.comentarios || '', idusuario: c.idusuario || ''
+          idcaja: c.idcaja, cantidadratas: c.cantidadratas,
+          sexo: c.sexo, fechanacimiento: c.fechanacimiento,
+          talla: c.talla || '', comentarios: c.comentarios || '',
+          idusuario: c.idusuario || '',
+          idubicacion: c.idubicacion || '',
         }
-        : { cantidadratas: 1, sexo: '', fechanacimiento: '', talla: '', comentarios: '', idusuario: '' }
+        : {
+          cantidadratas: 0, sexo: '', fechanacimiento: '',
+          talla: '', comentarios: '', idusuario: '',
+          idubicacion: '',
+        }
       this.modalCaja = true
     },
+    async guardarRata() {
+      this.saving = true; this.errorModal = null; this.errorIdRata = null
+      try {
+        const payload = {
+          sexo: this.formRata.sexo,
+          numerocola: this.formRata.numerocola,
+          idcaja: this.formRata.idcaja || null,
+        }
+        if (this.formRata.idrata) payload.idrata = this.formRata.idrata
+        if (this.formRata.idcondicion) payload.idcondicion = this.formRata.idcondicion
+        if (this.formRata.fechacirugia) payload.fechacirugia = this.formRata.fechacirugia
+
+        if (this.editandoRata) await api.put(`ratas/${this.formRata.id}/`, payload)
+        else await api.post('ratas/', payload)
+        this.modalRata = false
+        await this.fetchRatas()
+        this.$toast.success(this.editandoRata ? 'Rata actualizada.' : 'Rata registrada.')
+      } catch (err) {
+        const data = err.response?.data
+        if (data?.idrata) {
+          this.errorIdRata = Array.isArray(data.idrata) ? data.idrata[0] : data.idrata
+        } else {
+          this.errorModal = this._parseError(err, 'Error al guardar la rata.')
+        }
+      } finally { this.saving = false }
+    },
+
     async guardarCaja() {
       this.saving = true; this.errorModal = null
       try {
@@ -424,8 +554,10 @@ export default {
     },
 
     async fetchUsuarios() {
-      try { const r = await api.get('usuarios/'); this.usuarios = r.data }
-      catch { /* no bloqueante */ }
+      try {
+        const r = await api.get('usuarios/', { params: { page_size: 200 } })
+        this.usuarios = r.data.results ?? r.data
+      } catch { /* no bloqueante */ }
     },
 
     abrirModalRata(r = null) {
@@ -471,7 +603,7 @@ export default {
     async guardarRata() {
       this.saving = true; this.errorModal = null; this.errorIdRata = null
       try {
-        const payload = { sexo: this.formRata.sexo, numerocola: this.formRata.numerocola }
+        const payload = { sexo: this.formRata.sexo, numerocola: this.formRata.numerocola, idcaja: this.formRata.idcaja || null }
         if (this.formRata.idrata) payload.idrata = this.formRata.idrata
         if (this.formRata.idcaja) payload.idcaja = this.formRata.idcaja
         if (this.formRata.idcondicion) payload.idcondicion = this.formRata.idcondicion
@@ -508,6 +640,12 @@ export default {
     },
 
     // ── Helpers ────────────────────────────────────────────────
+
+    fmtShort(d) {
+      if (!d) return ''
+      const [y, m, day] = d.split('-')
+      return `${day}/${m}`   // solo día/mes para no ocupar espacio
+    },
     fmt(d) {
       if (!d) return '—'
       const [y, m, day] = d.split('-')
@@ -578,6 +716,72 @@ export default {
         this.$toast.error('No se pudo generar el reporte.')
       }
     },
+
+    async abrirPesos(r) {
+      this.rataSeleccionada = r
+      this.modalPesos = true
+      this.loadingPesos = true
+      this.formPeso = {
+        fecha: new Date().toISOString().split('T')[0],
+        peso: '', notas: '',
+      }
+      try {
+        const res = await api.get('pesos/', { params: { idrata: r.id, page_size: 100 } })
+        this.historialPesos = res.data.results ?? res.data
+      } catch { this.$toast.error('No se pudo cargar el historial.') }
+      finally { this.loadingPesos = false }
+    },
+
+    async registrarPeso() {
+      if (!this.formPeso.peso || !this.formPeso.fecha) {
+        this.$toast.warning('Completa la fecha y el peso.')
+        return
+      }
+      try {
+        await api.post('pesos/', {
+          idrata: this.rataSeleccionada.id,
+          fecha: this.formPeso.fecha,
+          peso: this.formPeso.peso,
+          notas: this.formPeso.notas || null,
+        })
+        this.$toast.success('Peso registrado.')
+        // Recargar historial
+        const res = await api.get('pesos/', {
+          params: { idrata: this.rataSeleccionada.id, page_size: 100 }
+        })
+        this.historialPesos = res.data.results ?? res.data
+        this.formPeso.peso = ''
+        this.formPeso.notas = ''
+        await this.fetchRatas()
+      } catch { this.$toast.error('Error al registrar el peso.') }
+    },
+
+    async eliminarPeso(p) {
+      const ok = await this.$confirm(`¿Eliminar el registro del ${p.fecha}?`, 'Eliminar peso')
+      if (!ok) return
+      try {
+        await api.delete(`pesos/${p.id}/`)
+        this.historialPesos = this.historialPesos.filter(x => x.id !== p.id)
+        this.$toast.success('Registro eliminado.')
+        await this.fetchRatas()
+      } catch { this.$toast.error('No se pudo eliminar.') }
+    },
+
+    pesoTendencia(index) {
+      if (index >= this.historialPesos.length - 1) return ''
+      const actual = this.historialPesos[index].peso
+      const anterior = this.historialPesos[index + 1].peso
+      if (actual > anterior) return '↑'
+      if (actual < anterior) return '↓'
+      return '='
+    },
+
+    async fetchUbicaciones() {
+      try {
+        const r = await api.get('ubicaciones/')
+        this.ubicaciones = r.data.results ?? r.data
+      } catch { /* no bloqueante */ }
+    },
   },
 }
 </script>
@@ -587,5 +791,40 @@ export default {
   max-width: 1100px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
+}
+
+.peso-form {
+  background: #f8f8fb;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+  border: .5px solid #e0e0e0;
+}
+
+.peso-historial {
+  margin-top: .5rem;
+}
+
+.tend {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.tend-up {
+  color: #2e7d32;
+}
+
+.tend-down {
+  color: #c62828;
+}
+
+.tend-eq {
+  color: #888;
+}
+
+.peso-fecha {
+  font-size: .72rem;
+  color: #aaa;
+  margin-left: 4px;
 }
 </style>

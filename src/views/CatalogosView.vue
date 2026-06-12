@@ -145,6 +145,42 @@
         </div>
       </div>
 
+      <!-- ══ UBICACIONES ══════════════════════════════════════════ -->
+      <div v-if="tabActiva === 'ubicaciones'">
+        <div class="tabla-header">
+          <h2>Ubicaciones</h2>
+          <button v-if="isEncargado" class="btn-primary" @click="abrirModal('ubicaciones')">+ Nueva</button>
+        </div>
+        <div class="table-card">
+          <div v-if="loading.ubicaciones" class="state-msg">Cargando…</div>
+          <div v-else-if="error.ubicaciones" class="state-msg error">{{ error.ubicaciones }}</div>
+          <table v-else class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Nombre</th>
+                <th>Descripción</th>
+                <th v-if="isEncargado">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in ubicaciones" :key="item.idubicacion">
+                <td>{{ item.idubicacion }}</td>
+                <td>{{ item.nombreubicacion }}</td>
+                <td>{{ item.descripcion || '—' }}</td>
+                <td v-if="isEncargado" class="actions">
+                  <button class="btn-icon" @click="abrirModal('ubicaciones', item)">✏️</button>
+                  <button v-if="isAdmin" class="btn-icon danger" @click="eliminar('ubicaciones', item)">🗑️</button>
+                </td>
+              </tr>
+              <tr v-if="!ubicaciones.length">
+                <td colspan="4" class="empty-row">No hay ubicaciones registradas.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </main>
   </div>
 </template>
@@ -158,6 +194,7 @@ const CONFIG = {
   anestesicos: { endpoint: 'anestesicos/', idKey: 'idanestesico', nombreKey: 'nombreanestesico', label: 'anestésico' },
   tejidos: { endpoint: 'tejidos/', idKey: 'idtejido', nombreKey: 'nombretejido', label: 'tejido' },
   condiciones: { endpoint: 'condiciones/', idKey: 'idcondicion', nombreKey: 'nombrecondicion', label: 'condición' },
+  ubicaciones: { endpoint: 'ubicaciones/', idKey: 'idubicacion', nombreKey: 'nombreubicacion', label: 'ubicación' },
 }
 
 export default {
@@ -170,10 +207,11 @@ export default {
         { key: 'anestesicos', label: 'Anestésicos' },
         { key: 'tejidos', label: 'Tejidos' },
         { key: 'condiciones', label: 'Condiciones' },
+        { key: 'ubicaciones', label: 'Ubicaciones' },
       ],
-      anestesicos: [], tejidos: [], condiciones: [],
-      loading: { anestesicos: true, tejidos: true, condiciones: true },
-      error: { anestesicos: null, tejidos: null, condiciones: null },
+      anestesicos: [], tejidos: [], condiciones: [], ubicaciones: [],
+      loading: { anestesicos: true, tejidos: true, condiciones: true, ubicaciones: true },
+      error: { anestesicos: null, tejidos: null, condiciones: null, ubicaciones: null },
       showModal: false,
       editando: false,
       saving: false,
@@ -192,6 +230,7 @@ export default {
       this.fetchCatalogo('anestesicos'),
       this.fetchCatalogo('tejidos'),
       this.fetchCatalogo('condiciones'),
+      this.fetchCatalogo('ubicaciones'),
     ])
   },
   methods: {

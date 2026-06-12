@@ -13,7 +13,7 @@
         </div>
       </header>
 
-      <!-- ── Estadísticas ────────────────────────────────── -->
+      <!-- Stats -->
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-icon">📦</div>
@@ -53,6 +53,38 @@
             <div class="stat-lbl">Usuarios</div>
           </div>
         </div>
+      </div>
+
+      <!-- Gráfica de cajas por ubicación -->
+      <div v-if="pieData.length" class="pie-card">
+        <h3 class="pie-title">Distribución de cajas por ubicación</h3>
+        <div class="pie-wrap">
+          <svg viewBox="0 0 200 200" width="160" height="160">
+            <g v-for="(s, i) in pieData" :key="i">
+              <path :d="pieSlicePath(s, 100, 100, 80)" :fill="s.color" stroke="#fff" stroke-width="2" />
+            </g>
+          </svg>
+          <div class="pie-legend">
+            <div v-for="s in pieData" :key="s.label" class="legend-item">
+              <span class="legend-dot" :style="{ background: s.color }"></span>
+              <span class="legend-label">{{ s.label }}</span>
+              <span class="legend-val">{{ s.total }} ({{ s.pct }}%)</span>
+            </div>
+            <div class="legend-item legend-item--gray">
+              <span class="legend-dot" style="background:#ddd"></span>
+              <span class="legend-label">Sin ubicación</span>
+              <span class="legend-val">
+                {{(stats.cajas || 0) - pieData.reduce((s, d) => s + d.total, 0)}}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dash-actions">
+        <button class="btn-primary" @click="$router.push('/inventario-semanal')">
+          📋 Iniciar registro semanal
+        </button>
       </div>
 
       <!-- ── Navegación ──────────────────────────────────── -->
@@ -98,6 +130,27 @@ export default {
   computed: {
     ...mapGetters(['currentUser', 'isAdmin']),
     user() { return this.currentUser },
+    pieData() {
+      const data = this.stats.cajas_por_ubicacion || []
+      if (!data.length) return []
+      const total = data.reduce((s, d) => s + d.total, 0)
+      const colors = ['#80201d', '#1a1a2e', '#c5a0a0', '#6a8caf', '#888']
+      let startAngle = 0
+      return data.map((d, i) => {
+        const pct = d.total / total
+        const angle = pct * 360
+        const start = startAngle
+        startAngle += angle
+        return {
+          label: d.idubicacion__nombreubicacion || 'Sin ubicación',
+          total: d.total,
+          pct: Math.round(pct * 100),
+          color: colors[i % colors.length],
+          startAngle: start,
+          endAngle: startAngle,
+        }
+      })
+    },
   },
   async created() {
     try {
@@ -105,6 +158,23 @@ export default {
       this.stats = res.data
     } catch { /* no bloqueante */ }
   },
+
+  methods: {
+    polarToXY(cx, cy, r, angleDeg) {
+      const rad = (angleDeg - 90) * (Math.PI / 180)
+      return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) }
+    },
+
+    pieSlicePath(slice, cx, cy, r) {
+      if (slice.pct >= 100) {
+        return `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.01} ${cy - r} Z`
+      }
+      const start = this.polarToXY(cx, cy, r, slice.startAngle)
+      const end = this.polarToXY(cx, cy, r, slice.endAngle)
+      const large = (slice.endAngle - slice.startAngle) > 180 ? 1 : 0
+      return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${large} 1 ${end.x} ${end.y} Z`
+    },
+  }
 }
 </script>
 
@@ -236,5 +306,63 @@ export default {
 .card-desc {
   font-size: .8rem;
   color: #888;
+}
+
+.pie-card {
+  background: #fff;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.pie-title {
+  font-size: .9rem;
+  font-weight: 600;
+  color: #888;
+  margin-bottom: 1rem;
+  letter-spacing: .02em;
+}
+
+.pie-wrap {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.pie-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: .85rem;
+}
+
+.legend-item--gray {
+  opacity: .5;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.legend-label {
+  color: #444;
+  flex: 1;
+}
+
+.legend-val {
+  color: #888;
+  font-size: .8rem;
+  white-space: nowrap;
 }
 </style>

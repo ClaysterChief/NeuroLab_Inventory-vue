@@ -41,6 +41,12 @@ const routes = [
     // Solo Administrador puede gestionar usuarios
     meta: { requiresAuth: true, requiredRole: ROLE_NAMES.ADMINISTRADOR },
   },
+  {
+    path: '/inventario-semanal',
+    name: 'InventarioSemanal',
+    component: () => import('@/views/InventarioSemanalView.vue'),
+    meta: { requiresAuth: true }
+  },
 ]
 
 const router = createRouter({

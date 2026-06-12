@@ -250,11 +250,11 @@ export default {
     async fetchCatalogos() {
       try {
         const [ratas, anest, tejidos] = await Promise.all([
-          api.get('ratas/'),
+          api.get('ratas/', { params: { page_size: 200 } }),
           api.get('anestesicos/'),
           api.get('tejidos/'),
         ])
-        this.ratas = ratas.data
+        this.ratas = ratas.data.results ?? ratas.data
         this.anestesicos = anest.data
         this.tejidos = tejidos.data
       } catch { /* no bloqueante */ }
