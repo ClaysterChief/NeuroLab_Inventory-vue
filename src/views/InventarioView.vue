@@ -3,18 +3,40 @@
     <Navbar />
     <main class="content">
 
-      <!-- ══ SECCIÓN CAJAS ═══════════════════════════════════ -->
-      <div class="page-header">
-        <h1>Inventario de Cajas</h1>
-        <div style="display:flex;gap:8px">
+      <!-- ══ TABS DE SELECCIÓN DE TABLA ══════════════════════ -->
+      <div class="inv-tabs-wrap">
+        <div class="inv-tabs">
+          <button class="inv-tab" :class="{ 'inv-tab--active': vistaActiva === 'cajas' }"
+                  @click="cambiarVista('cajas')">
+            <Icon name="box" :size="15" />
+            Cajas
+          </button>
+          <button class="inv-tab" :class="{ 'inv-tab--active': vistaActiva === 'ratas' }"
+                  @click="cambiarVista('ratas')">
+            <Icon name="rat" :size="15" />
+            Ratas
+          </button>
+          <button class="inv-tab" :class="{ 'inv-tab--active': vistaActiva === 'ambas' }"
+                  @click="cambiarVista('ambas')">
+            <Icon name="users" :size="15" />
+            Ambas
+          </button>
+        </div>
+        <div class="inv-tabs-actions">
           <button class="btn-outline" @click="descargarReporte('inventario', 'pdf')">⬇ PDF</button>
           <button class="btn-outline" @click="descargarReporte('inventario', 'excel')">⬇ Excel</button>
-          <button v-if="isEncargado" class="btn-primary" @click="abrirModalCaja()">+ Nueva caja</button>
         </div>
       </div>
 
+      <!-- ══ SECCIÓN CAJAS ═══════════════════════════════════ -->
+      <transition name="tab-section">
+        <div v-show="vistaActiva === 'cajas' || vistaActiva === 'ambas'" class="inv-section">
+          <div class="page-header">
+            <h1>Inventario de Cajas</h1>
+            <button v-if="isEncargado" class="btn-primary btn-breathe" @click="abrirModalCaja()">+ Nueva caja</button>
+          </div>
+
       <div class="filters-bar">
-        <!-- Cajas -->
         <input v-model="busquedaCaja" type="text" placeholder="Buscar por comentarios…" class="search-input"
           @input="cajasPage = 1; fetchCajasDebounced()" />
         <select v-model="filtroSexoCaja" class="filter-select" @change="cajasPage = 1; fetchCajas()">
@@ -32,8 +54,19 @@
       </div>
 
       <div class="table-card">
-        <div v-if="loadingCajas" class="state-msg">Cargando cajas…</div>
-        <div v-else-if="errorCajas" class="state-msg error">{{ errorCajas }}</div>
+        <!-- ── Skeleton loader mientras carga ── -->
+        <div v-if="loadingCajas" class="skeleton-table">
+          <div class="skeleton-row" v-for="n in 5" :key="n">
+            <div class="skeleton skeleton-cell skeleton-cell--sm"></div>
+            <div class="skeleton skeleton-cell skeleton-cell--sm"></div>
+            <div class="skeleton skeleton-cell skeleton-cell--md"></div>
+            <div class="skeleton skeleton-cell skeleton-cell--md"></div>
+            <div class="skeleton skeleton-cell skeleton-cell--sm"></div>
+            <div class="skeleton skeleton-cell skeleton-cell--md"></div>
+            <div class="skeleton skeleton-cell skeleton-cell--lg"></div>
+          </div>
+        </div>
+        <div v-else-if="errorCajas" class="state-msg error shake-error">{{ errorCajas }}</div>
         <table v-else class="data-table">
           <thead>
             <tr>
@@ -48,8 +81,8 @@
               <th v-if="isEncargado">Acciones</th>
             </tr>
           </thead>
-          <tbody>
-            <tr v-for="c in cajas" :key="c.idcaja">
+          <transition-group name="list" tag="tbody">
+            <tr v-for="c in cajas" :key="c.idcaja" :class="{ 'row-removing': removingCajaId === c.idcaja }">
               <td><strong>{{ c.idcaja }}</strong></td>
               <td>{{ c.cantidadratas }}</td>
               <td><span class="badge" :class="c.sexo === 'Macho' ? 'badge-blue' : 'badge-pink'">{{ c.sexo }}</span></td>
@@ -63,13 +96,13 @@
                 <button v-if="isAdmin" class="btn-icon danger" @click="eliminarCaja(c)" title="Eliminar">🗑️</button>
               </td>
             </tr>
-            <tr v-if="!cajas.length">
-              <td :colspan="isEncargado ? 8 : 7" class="empty-row">No hay cajas registradas.</td>
-            </tr>
-          </tbody>
+          </transition-group>
         </table>
+        <div v-if="!loadingCajas && !errorCajas && !cajas.length" class="empty-state">
+          <span class="empty-state-icon">📦</span>
+          No hay cajas registradas.
+        </div>
 
-        <!-- Paginación Cajas — va dentro del div.table-card de cajas -->
         <div v-if="cajasTotalPages > 1" class="pagination-bar">
           <button :disabled="cajasPage === 1" @click="cajasPage--; fetchCajas()">← Anterior</button>
           <span>Página {{ cajasPage }} de {{ cajasTotalPages }} · {{ cajasTotal }} registros</span>
@@ -77,35 +110,48 @@
         </div>
       </div>
 
-      <!-- ══ SECCIÓN RATAS ════════════════════════════════════ -->
-      <div class="section-divider"></div>
+      </div><!-- /.inv-section cajas -->
+      </transition>
 
-      <div class="page-header">
-        <h1>Registro de Ratas</h1>
-        <button v-if="isEncargado" class="btn-primary" @click="abrirModalRata()">+ Nueva rata</button>
-      </div>
+      <!-- ══ SECCIÓN RATAS ════════════════════════════════════ -->
+      <transition name="tab-section">
+        <div v-show="vistaActiva === 'ratas' || vistaActiva === 'ambas'" class="inv-section">
+
+          <div class="page-header">
+            <h1>Registro de Ratas</h1>
+            <button v-if="isEncargado" class="btn-primary btn-breathe" @click="abrirModalRata()">+ Nueva rata</button>
+          </div>
 
       <div class="filters-bar">
-        <<!-- Ratas -->
-          <input v-model="busquedaRata" type="text" placeholder="Buscar por número de cola…" class="search-input"
-            @input="ratasPage = 1; fetchRatasDebounced()" />
-          <select v-model="filtroSexoRata" class="filter-select" @change="ratasPage = 1; fetchRatas()">
-            <option value="">Todos los sexos</option>
-            <option value="Macho">Macho</option>
-            <option value="Hembra">Hembra</option>
-          </select>
-          <select v-model="filtroCaja" class="filter-select" @change="ratasPage = 1; fetchRatas()">
-            <option value="">Todas las cajas</option>
-            <option v-for="c in cajas" :key="c.idcaja" :value="c.idcaja">
-              Caja #{{ c.idcaja }} ({{ c.sexo }})
-            </option>
-          </select>
-          <button class="btn-secondary" @click="limpiarRatas">Limpiar</button>
+        <input v-model="busquedaRata" type="text" placeholder="Buscar por ID de rata (ej. M-3, H-12)…" class="search-input"
+          @input="ratasPage = 1; fetchRatasDebounced()" />
+        <select v-model="filtroSexoRata" class="filter-select" @change="ratasPage = 1; fetchRatas()">
+          <option value="">Todos los sexos</option>
+          <option value="Macho">Macho</option>
+          <option value="Hembra">Hembra</option>
+        </select>
+        <select v-model="filtroCaja" class="filter-select" @change="ratasPage = 1; fetchRatas()">
+          <option value="">Todas las cajas</option>
+          <option v-for="c in cajas" :key="c.idcaja" :value="c.idcaja">
+            Caja #{{ c.idcaja }} ({{ c.sexo }})
+          </option>
+        </select>
+        <button class="btn-secondary" @click="limpiarRatas">Limpiar</button>
       </div>
 
       <div class="table-card">
-        <div v-if="loadingRatas" class="state-msg">Cargando ratas…</div>
-        <div v-else-if="errorRatas" class="state-msg error">{{ errorRatas }}</div>
+        <div v-if="loadingRatas" class="skeleton-table">
+          <div class="skeleton-row" v-for="n in 5" :key="n">
+            <div class="skeleton skeleton-cell skeleton-cell--sm"></div>
+            <div class="skeleton skeleton-cell skeleton-cell--sm"></div>
+            <div class="skeleton skeleton-cell skeleton-cell--sm"></div>
+            <div class="skeleton skeleton-cell skeleton-cell--md"></div>
+            <div class="skeleton skeleton-cell skeleton-cell--md"></div>
+            <div class="skeleton skeleton-cell skeleton-cell--md"></div>
+            <div class="skeleton skeleton-cell skeleton-cell--sm"></div>
+          </div>
+        </div>
+        <div v-else-if="errorRatas" class="state-msg error shake-error">{{ errorRatas }}</div>
         <table v-else class="data-table">
           <thead>
             <tr>
@@ -119,8 +165,8 @@
               <th v-if="isEncargado">Acciones</th>
             </tr>
           </thead>
-          <tbody>
-            <tr v-for="r in ratas" :key="`${r.sexo}-${r.idrata}`">
+          <transition-group name="list" tag="tbody">
+            <tr v-for="r in ratas" :key="`${r.sexo}-${r.idrata}`" :class="{ 'row-removing': removingRataId === r.id }">
               <td><strong>{{ r.sexo[0] }}-{{ r.idrata }}</strong></td>
               <td><span class="badge" :class="r.sexo === 'Macho' ? 'badge-blue' : 'badge-pink'">{{ r.sexo }}</span></td>
               <td>{{ r.numerocola }}</td>
@@ -141,11 +187,12 @@
                 <button v-if="isAdmin" class="btn-icon danger" @click="eliminarRata(r)" title="Eliminar">🗑️</button>
               </td>
             </tr>
-            <tr v-if="!ratas.length">
-              <td :colspan="isEncargado ? 8 : 7" class="empty-row">No hay ratas registradas.</td>
-            </tr>
-          </tbody>
+          </transition-group>
         </table>
+        <div v-if="!loadingRatas && !errorRatas && !ratas.length" class="empty-state">
+          <span class="empty-state-icon">🐀</span>
+          No hay ratas registradas.
+        </div>
         <div v-if="ratasTotalPages > 1" class="pagination-bar">
           <button :disabled="ratasPage === 1" @click="ratasPage--; fetchRatas()">← Anterior</button>
           <span>Página {{ ratasPage }} de {{ ratasTotalPages }} · {{ ratasTotal }} registros</span>
@@ -153,258 +200,314 @@
         </div>
       </div>
 
+        </div><!-- /.inv-section ratas -->
+      </transition>
+
       <!-- ══ MODAL CAJA ════════════════════════════════════════ -->
-      <div v-if="modalCaja" class="modal-overlay" @click.self="modalCaja = false">
-        <div class="modal">
-          <h2>{{ editandoCaja ? 'Editar caja' : 'Nueva caja' }}</h2>
-          <form @submit.prevent="guardarCaja">
-            <div class="fields-grid">
-              <div class="field">
-                <label>Sexo <span class="req">*</span></label>
-                <select v-model="formCaja.sexo" required>
-                  <option value="">Seleccionar…</option>
-                  <option value="Macho">Macho</option>
-                  <option value="Hembra">Hembra</option>
-                </select>
-              </div>
-              <div class="field">
-                <label>Fecha de nacimiento <span class="req">*</span></label>
-                <input v-model="formCaja.fechanacimiento" type="date" required />
-              </div>
-              <div class="field">
-                <label>Talla</label>
-                <select v-model="formCaja.talla">
-                  <option value="">—</option>
-                  <option value="Pequeña">Pequeña</option>
-                  <option value="Mediana">Mediana</option>
-                  <option value="Grande">Grande</option>
-                </select>
-              </div>
-              <div class="field">
-                <label>Ubicación</label>
-                <select v-model.number="formCaja.idubicacion">
-                  <option value="">Sin asignar</option>
-                  <option v-for="u in ubicaciones" :key="u.idubicacion" :value="u.idubicacion">
-                    {{ u.nombreubicacion }}
-                  </option>
-                </select>
-              </div>
-              <div class="field field-full">
-                <label>Responsable</label>
-                <select v-model="formCaja.idusuario">
-                  <option value="">Sin asignar</option>
-                  <option v-for="u in usuarios" :key="u.idusuario" :value="u.idusuario">
-                    {{ u.nombreusuario }} — {{ u.apellidopaterno }}
-                  </option>
-                </select>
-              </div>
-              <div class="field field-full">
-                <label>Comentarios</label>
-                <textarea v-model="formCaja.comentarios" rows="2" />
-              </div>
+      <transition name="modal-fade">
+        <div v-if="modalCaja" class="modal-overlay" @click.self="modalCaja = false">
+          <transition name="modal-pop" appear>
+            <div class="modal" v-if="modalCaja">
+              <h2>{{ editandoCaja ? 'Editar caja' : 'Nueva caja' }}</h2>
+              <form @submit.prevent="guardarCaja">
+                <div class="fields-grid">
+                  <div class="field">
+                    <label>Sexo <span class="req">*</span></label>
+                    <select v-model="formCaja.sexo" required>
+                      <option value="">Seleccionar…</option>
+                      <option value="Macho">Macho</option>
+                      <option value="Hembra">Hembra</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Fecha de nacimiento <span class="req">*</span></label>
+                    <input v-model="formCaja.fechanacimiento" type="date" required />
+                  </div>
+                  <div class="field">
+                    <label>Talla</label>
+                    <select v-model="formCaja.talla">
+                      <option value="">—</option>
+                      <option value="Pequeña">Pequeña</option>
+                      <option value="Mediana">Mediana</option>
+                      <option value="Grande">Grande</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Ubicación</label>
+                    <select v-model.number="formCaja.idubicacion">
+                      <option value="">Sin asignar</option>
+                      <option v-for="u in ubicaciones" :key="u.idubicacion" :value="u.idubicacion">
+                        {{ u.nombreubicacion }}
+                      </option>
+                    </select>
+                  </div>
+                  <div class="field field-full">
+                    <label>Responsable</label>
+                    <select v-model="formCaja.idusuario">
+                      <option value="">Sin asignar</option>
+                      <option v-for="u in usuarios" :key="u.idusuario" :value="u.idusuario">
+                        {{ u.nombreusuario }} — {{ u.apellidopaterno }}
+                      </option>
+                    </select>
+                  </div>
+                  <div class="field field-full">
+                    <label>Comentarios</label>
+                    <textarea v-model="formCaja.comentarios" rows="2" />
+                  </div>
+                </div>
+                <p v-if="errorModal" class="form-error shake-error" :key="errorModalKey">{{ errorModal }}</p>
+                <div class="modal-actions">
+                  <button type="button" class="btn-secondary" @click="modalCaja = false">Cancelar</button>
+                  <button type="submit" class="btn-primary" :disabled="saving">
+                    <span v-if="saving" class="spinner-bounce">⏳</span>
+                    <span v-else>Guardar</span>
+                  </button>
+                </div>
+              </form>
             </div>
-            <p v-if="errorModal" class="form-error">{{ errorModal }}</p>
-            <div class="modal-actions">
-              <button type="button" class="btn-secondary" @click="modalCaja = false">Cancelar</button>
-              <button type="submit" class="btn-primary" :disabled="saving">{{ saving ? 'Guardando…' : 'Guardar'
-              }}</button>
-            </div>
-          </form>
+          </transition>
         </div>
-      </div>
+      </transition>
 
       <!-- ══ MODAL RATA ════════════════════════════════════════ -->
-      <div v-if="modalRata" class="modal-overlay" @click.self="modalRata = false">
-        <div class="modal">
-          <h2>{{ editandoRata ? 'Editar rata' : 'Registrar rata' }}</h2>
-          <form @submit.prevent="guardarRata">
-            <div class="fields-grid">
+      <transition name="modal-fade">
+        <div v-if="modalRata" class="modal-overlay" @click.self="modalRata = false">
+          <transition name="modal-pop" appear>
+            <div class="modal" v-if="modalRata">
+              <h2>{{ editandoRata ? 'Editar rata' : 'Registrar rata' }}</h2>
+              <form @submit.prevent="guardarRata">
+                <div class="fields-grid">
 
-              <!-- Sexo -->
-              <div class="field">
-                <label>Sexo <span class="req">*</span></label>
-                <select v-model="formRata.sexo" required @change="cargarSiguienteId">
-                  <option value="">Seleccionar…</option>
-                  <option value="Macho">Macho</option>
-                  <option value="Hembra">Hembra</option>
-                </select>
-              </div>
+                  <div class="field">
+                    <label>Sexo <span class="req">*</span></label>
+                    <select v-model="formRata.sexo" required @change="cargarSiguienteId">
+                      <option value="">Seleccionar…</option>
+                      <option value="Macho">Macho</option>
+                      <option value="Hembra">Hembra</option>
+                    </select>
+                  </div>
 
-              <!-- ID con opción manual -->
-              <div class="field">
-                <label>
-                  ID de rata
-                  <span class="label-hint">
-                    {{ formRata.sexo ? `Siguiente disponible: ${siguienteId}` : '' }}
-                  </span>
-                </label>
-                <div class="id-row">
-                  <input v-model.number="formRata.idrata" type="number" min="1"
-                    :placeholder="formRata.sexo ? `Auto: ${siguienteId}` : 'Selecciona sexo primero'"
-                    :disabled="!formRata.sexo || !isEncargado" :class="{ 'input-error': errorIdRata }" />
-                  <button v-if="formRata.sexo && isEncargado" type="button" class="btn-auto" @click="usarIdAuto"
-                    title="Usar ID automático">Auto</button>
+                  <div class="field field-full">
+                    <label>
+                      ID de rata
+                      <span class="label-hint">
+                        {{ formRata.sexo ? `Siguiente disponible: ${siguienteId}` : '' }}
+                      </span>
+                    </label>
+                    <div class="id-row">
+                      <input v-model.number="formRata.idrata" type="number" min="1"
+                        :placeholder="formRata.sexo ? `Auto: ${siguienteId}` : 'Selecciona sexo primero'"
+                        :disabled="!formRata.sexo || !isEncargado"
+                        :class="{ 'input-error shake-error': errorIdRata }" />
+                      <button v-if="formRata.sexo && isEncargado" type="button" class="btn-auto" @click="usarIdAuto"
+                        title="Usar ID automático">Auto</button>
+                    </div>
+                    <span v-if="errorIdRata" class="field-error">{{ errorIdRata }}</span>
+                    <span class="field-hint">Deja vacío para asignar automáticamente.</span>
+                  </div>
+
+                  <div class="field">
+                    <label>N° de cola <span class="req">*</span></label>
+                    <input v-model.number="formRata.numerocola" type="number" min="1" required />
+                  </div>
+
+                  <div class="field">
+                    <label>Caja</label>
+                    <select v-model.number="formRata.idcaja">
+                      <option value="">Sin asignar</option>
+                      <option v-for="c in cajasFiltradas" :key="c.idcaja" :value="c.idcaja">
+                        Caja #{{ c.idcaja }} — {{ c.sexo }}
+                      </option>
+                    </select>
+                  </div>
+
+                  <div class="field">
+                    <label>Condición</label>
+                    <select v-model="formRata.idcondicion">
+                      <option value="">Sin condición</option>
+                      <option v-for="c in condiciones" :key="c.idcondicion" :value="c.idcondicion">
+                        {{ c.nombrecondicion }}
+                      </option>
+                    </select>
+                  </div>
+
+                  <div class="field field-full">
+                    <label>Fecha de cirugía / protocolo</label>
+                    <input v-model="formRata.fechacirugia" type="date" />
+                  </div>
                 </div>
-                <span v-if="errorIdRata" class="field-error">{{ errorIdRata }}</span>
-                <span class="field-hint">Deja vacío para asignar automáticamente.</span>
-              </div>
 
-              <!-- Número de cola -->
-              <div class="field">
-                <label>N° de cola <span class="req">*</span></label>
-                <input v-model.number="formRata.numerocola" type="number" min="1" required />
-              </div>
-
-              <!-- Caja -->
-              <div class="field">
-                <label>Caja</label>
-                <select v-model.number="formRata.idcaja">
-                  <option value="">Sin asignar</option>
-                  <option v-for="c in cajasFiltradas" :key="c.idcaja" :value="c.idcaja">
-                    Caja #{{ c.idcaja }} — {{ c.sexo }}
-                  </option>
-                </select>
-              </div>
-
-              <!-- Condición -->
-              <div class="field">
-                <label>Condición</label>
-                <select v-model="formRata.idcondicion">
-                  <option value="">Sin condición</option>
-                  <option v-for="c in condiciones" :key="c.idcondicion" :value="c.idcondicion">
-                    {{ c.nombrecondicion }}
-                  </option>
-                </select>
-              </div>
-
-              <!-- Fecha cirugía -->
-              <div class="field field-full">
-                <label>Fecha de cirugía / protocolo</label>
-                <input v-model="formRata.fechacirugia" type="date" />
-              </div>
+                <p v-if="errorModal" class="form-error shake-error" :key="errorModalKey">{{ errorModal }}</p>
+                <div class="modal-actions">
+                  <button type="button" class="btn-secondary" @click="modalRata = false">Cancelar</button>
+                  <button type="submit" class="btn-primary" :disabled="saving">
+                    <span v-if="saving" class="spinner-bounce">⏳</span>
+                    <span v-else>Guardar</span>
+                  </button>
+                </div>
+              </form>
             </div>
-
-            <p v-if="errorModal" class="form-error">{{ errorModal }}</p>
-            <div class="modal-actions">
-              <button type="button" class="btn-secondary" @click="modalRata = false">Cancelar</button>
-              <button type="submit" class="btn-primary" :disabled="saving">{{ saving ? 'Guardando…' : 'Guardar'
-              }}</button>
-            </div>
-          </form>
+          </transition>
         </div>
-      </div>
+      </transition>
+
       <!-- ══ MODAL HISTORIAL DE PESOS ══════════════════════════════ -->
-      <div v-if="modalPesos" class="modal-overlay" @click.self="modalPesos = false">
-        <div class="modal modal--wide">
-          <h2>
-            ⚖️ Historial de pesos —
-            <span v-if="rataSeleccionada">
-              {{ rataSeleccionada.sexo[0] }}-{{ rataSeleccionada.idrata }}
-              (Cola {{ rataSeleccionada.numerocola }})
-            </span>
-          </h2>
+      <transition name="modal-fade">
+        <div v-if="modalPesos" class="modal-overlay" @click.self="modalPesos = false">
+          <transition name="modal-pop" appear>
+            <div class="modal modal--wide" v-if="modalPesos">
+              <h2>
+                ⚖️ Historial de pesos —
+                <span v-if="rataSeleccionada">
+                  {{ rataSeleccionada.sexo[0] }}-{{ rataSeleccionada.idrata }}
+                  (Cola {{ rataSeleccionada.numerocola }})
+                </span>
+              </h2>
 
-          <!-- Formulario de nuevo peso -->
-          <div class="peso-form">
-            <div class="fields-grid">
-              <div class="field">
-                <label>Fecha <span class="req">*</span></label>
-                <input v-model="formPeso.fecha" type="date" />
+              <div class="peso-form">
+                <div class="fields-grid">
+                  <div class="field">
+                    <label>Fecha <span class="req">*</span></label>
+                    <input v-model="formPeso.fecha" type="date" />
+                  </div>
+                  <div class="field">
+                    <label>Peso (g) <span class="req">*</span></label>
+                    <input v-model.number="formPeso.peso" type="number" step="0.1" placeholder="320" />
+                  </div>
+                  <div class="field field-full">
+                    <label>Notas</label>
+                    <input v-model="formPeso.notas" type="text" placeholder="Observaciones opcionales…" />
+                  </div>
+                </div>
+                <div style="display:flex;justify-content:flex-end;margin-top:.75rem">
+                  <button class="btn-primary" @click="registrarPeso" :disabled="guardandoPeso">
+                    <span v-if="guardandoPeso" class="spinner-bounce">⏳</span>
+                    <span v-else>+ Registrar peso</span>
+                  </button>
+                </div>
               </div>
-              <div class="field">
-                <label>Peso (g) <span class="req">*</span></label>
-                <input v-model.number="formPeso.peso" type="number" step="0.1" placeholder="320" />
-              </div>
-              <div class="field field-full">
-                <label>Notas</label>
-                <input v-model="formPeso.notas" type="text" placeholder="Observaciones opcionales…" />
-              </div>
-            </div>
-            <div style="display:flex;justify-content:flex-end;margin-top:.75rem">
-              <button class="btn-primary" @click="registrarPeso">+ Registrar peso</button>
-            </div>
-          </div>
 
-          <!-- Historial -->
-          <div class="peso-historial">
-            <div v-if="loadingPesos" class="state-msg">Cargando historial…</div>
-            <table v-else-if="historialPesos.length" class="data-table">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Peso (g)</th>
-                  <th>Tendencia</th>
-                  <th>Notas</th>
-                  <th v-if="isAdmin">Eliminar</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(p, i) in historialPesos" :key="p.id">
-                  <td>{{ fmt(p.fecha) }}</td>
-                  <td><strong>{{ p.peso }}</strong></td>
-                  <td>
-                    <span :class="['tend', pesoTendencia(i) === '↑' ? 'tend-up'
-                      : pesoTendencia(i) === '↓' ? 'tend-down' : 'tend-eq']">
-                      {{ pesoTendencia(i) || '—' }}
+              <div class="peso-historial">
+                <!-- ── Gráfica de tendencia de peso ────────────────── -->
+                <div v-if="!loadingPesos && historialPesos.length >= 2" class="peso-chart-card">
+                  <div class="peso-chart-header">
+                    <span class="peso-chart-title">Tendencia de peso</span>
+                    <span class="peso-trend-badge" :class="pesoTrendInfo.cls">
+                      <Icon :name="pesoTrendInfo.icon" :size="14" />
+                      {{ pesoTrendInfo.label }}
                     </span>
-                  </td>
-                  <td>{{ p.notas || '—' }}</td>
-                  <td v-if="isAdmin">
-                    <button class="btn-icon danger" @click="eliminarPeso(p)">🗑️</button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <div v-else class="state-msg">Sin registros de peso todavía.</div>
-          </div>
+                  </div>
+                  <svg viewBox="0 0 320 110" class="peso-chart-svg">
+                    <!-- líneas guía -->
+                    <line x1="0" y1="20" x2="320" y2="20" class="peso-chart-grid" />
+                    <line x1="0" y1="55" x2="320" y2="55" class="peso-chart-grid" />
+                    <line x1="0" y1="90" x2="320" y2="90" class="peso-chart-grid" />
+                    <!-- área bajo la curva -->
+                    <polygon :points="pesoChartArea" class="peso-chart-area" :class="pesoTrendInfo.cls" />
+                    <!-- línea principal -->
+                    <polyline :points="pesoChartLine" class="peso-chart-line" :class="pesoTrendInfo.cls" />
+                    <!-- puntos -->
+                    <circle v-for="(p, i) in pesoChartPoints" :key="i"
+                      :cx="p.x" :cy="p.y" r="3.2" class="peso-chart-dot" :class="pesoTrendInfo.cls" />
+                  </svg>
+                  <div class="peso-chart-labels">
+                    <span>{{ fmtShort(historialPesosAsc[0]?.fecha) }}</span>
+                    <span>{{ fmtShort(historialPesosAsc[historialPesosAsc.length - 1]?.fecha) }}</span>
+                  </div>
+                </div>
+                <div v-else-if="!loadingPesos && historialPesos.length === 1" class="peso-chart-hint">
+                  Registra al menos 2 pesos para ver la gráfica de tendencia.
+                </div>
 
-          <div class="modal-actions">
-            <button class="btn-secondary" @click="modalPesos = false">Cerrar</button>
-          </div>
+                <div v-if="loadingPesos" class="skeleton-table">
+                  <div class="skeleton-row" v-for="n in 3" :key="n">
+                    <div class="skeleton skeleton-cell skeleton-cell--md"></div>
+                    <div class="skeleton skeleton-cell skeleton-cell--sm"></div>
+                    <div class="skeleton skeleton-cell skeleton-cell--sm"></div>
+                    <div class="skeleton skeleton-cell skeleton-cell--lg"></div>
+                  </div>
+                </div>
+                <table v-else-if="historialPesos.length" class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Peso (g)</th>
+                      <th>Tendencia</th>
+                      <th>Notas</th>
+                      <th v-if="isAdmin">Eliminar</th>
+                    </tr>
+                  </thead>
+                  <transition-group name="list" tag="tbody">
+                    <tr v-for="(p, i) in historialPesos" :key="p.id" :class="{ 'row-removing': removingPesoId === p.id }">
+                      <td>{{ fmt(p.fecha) }}</td>
+                      <td><strong>{{ p.peso }}</strong></td>
+                      <td>
+                        <span :class="['tend', pesoTendencia(i) === '↑' ? 'tend-up'
+                          : pesoTendencia(i) === '↓' ? 'tend-down' : 'tend-eq']">
+                          {{ pesoTendencia(i) || '—' }}
+                        </span>
+                      </td>
+                      <td>{{ p.notas || '—' }}</td>
+                      <td v-if="isAdmin">
+                        <button class="btn-icon danger" @click="eliminarPeso(p)">🗑️</button>
+                      </td>
+                    </tr>
+                  </transition-group>
+                </table>
+                <div v-else class="empty-state">
+                  <span class="empty-state-icon">⚖️</span>
+                  Sin registros de peso todavía.
+                </div>
+              </div>
+
+              <div class="modal-actions">
+                <button class="btn-secondary" @click="modalPesos = false">Cerrar</button>
+              </div>
+            </div>
+          </transition>
         </div>
-      </div>
+      </transition>
     </main>
   </div>
 </template>
 
 <script>
 import Navbar from '../components/Navbar.vue'
+import Icon from '../components/Icon.vue'
 import api from '../api'
 import { mapGetters } from 'vuex'
 import { debounce } from '../utils/debounce'
 
 export default {
   name: 'InventarioView',
-  components: { Navbar },
+  components: { Navbar, Icon },
   data() {
     return {
-      // Cajas
       cajas: [], loadingCajas: true, errorCajas: null,
       busquedaCaja: '', filtroSexoCaja: '',
       modalCaja: false, editandoCaja: false,
       formCaja: { cantidadratas: 1, sexo: '', fechanacimiento: '', talla: '', comentarios: '', idusuario: '' },
-      // Ratas
+      removingCajaId: null,
       ratas: [], loadingRatas: true, errorRatas: null,
       busquedaRata: '', filtroSexoRata: '', filtroCaja: '',
       condiciones: [],
       modalRata: false, editandoRata: false,
       siguienteId: '—', errorIdRata: null,
       formRata: { id: null, idrata: '', sexo: '', numerocola: '', idcaja: '', idcondicion: '', fechacirugia: '' },
-      // Compartido
-      saving: false, errorModal: null,
-      // Catálogos de apoyo
+      removingRataId: null,
+      saving: false, errorModal: null, errorModalKey: 0,
       usuarios: [],
-      // Paginación cajas
       cajasPage: 1, cajasTotalPages: 1, cajasTotal: 0,
-      // Paginación ratas
+      // Vista activa: 'cajas' | 'ratas' | 'ambas'
+      vistaActiva: 'ambas',
       ratasPage: 1, ratasTotalPages: 1, ratasTotal: 0,
-      // Dropdown de cajas para el modal de ratas (sin paginar)
       cajasDropdown: [],
-      // Pesos semanales
       modalPesos: false,
       rataSeleccionada: null,
       historialPesos: [],
       loadingPesos: false,
+      guardandoPeso: false,
+      removingPesoId: null,
       formPeso: { fecha: '', peso: '', notas: '' },
       ubicaciones: [],
       filtroUbicacion: '',
@@ -412,11 +515,61 @@ export default {
   },
   computed: {
     ...mapGetters(['isEncargado', 'isAdmin']),
-    // Filtrar cajas por el sexo seleccionado en el modal de rata
     cajasFiltradas() {
       const source = this.cajasDropdown.length ? this.cajasDropdown : this.cajas
       if (!this.formRata.sexo) return source
       return source.filter(c => c.sexo === this.formRata.sexo)
+    },
+
+    // ── Gráfica de tendencia de peso ──────────────────────────────
+    historialPesosAsc() {
+      // historialPesos viene del API ordenado del más reciente al más
+      // antiguo; para graficar de izquierda (antiguo) a derecha (reciente)
+      // se invierte el orden.
+      return [...this.historialPesos].reverse()
+    },
+
+    pesoChartPoints() {
+      const data = this.historialPesosAsc
+      if (data.length < 2) return []
+      const pesos = data.map(p => Number(p.peso))
+      const min = Math.min(...pesos)
+      const max = Math.max(...pesos)
+      const range = (max - min) || 1
+      const padY = 15
+      const chartH = 110 - padY * 2
+      const w = 320
+      const step = w / (data.length - 1)
+      return data.map((p, i) => {
+        const x = i * step
+        const normalized = (Number(p.peso) - min) / range
+        const y = padY + (1 - normalized) * chartH
+        return { x, y, peso: p.peso, fecha: p.fecha }
+      })
+    },
+
+    pesoChartLine() {
+      return this.pesoChartPoints.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+    },
+
+    pesoChartArea() {
+      const pts = this.pesoChartPoints
+      if (!pts.length) return ''
+      const first = pts[0]
+      const last = pts[pts.length - 1]
+      return `${first.x},110 ` + pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ') + ` ${last.x},110`
+    },
+
+    pesoTrendInfo() {
+      const data = this.historialPesosAsc
+      if (data.length < 2) return { label: 'Sin datos suficientes', icon: 'minus', cls: 'trend-neutral' }
+      const first = Number(data[0].peso)
+      const last = Number(data[data.length - 1].peso)
+      const diff = last - first
+      const pct = first ? (diff / first) * 100 : 0
+      if (Math.abs(pct) < 1) return { label: 'Peso estable', icon: 'minus', cls: 'trend-neutral' }
+      if (diff > 0) return { label: `Subió ${pct.toFixed(1)}%`, icon: 'trending-up', cls: 'trend-up' }
+      return { label: `Bajó ${Math.abs(pct).toFixed(1)}%`, icon: 'trending-down', cls: 'trend-down' }
     },
   },
   async created() {
@@ -430,7 +583,16 @@ export default {
     ])
   },
   methods: {
-    // ── Cajas ─────────────────────────────────────────────────
+    _showError(msg) {
+      this.errorModal = msg
+      this.errorModalKey++
+    },
+
+    cambiarVista(vista) {
+      if (this.vistaActiva === vista) return
+      this.vistaActiva = vista
+    },
+
     async fetchCajas() {
       this.loadingCajas = true
       this.errorCajas = null
@@ -438,8 +600,8 @@ export default {
         const params = { page: this.cajasPage }
         if (this.busquedaCaja) params.search = this.busquedaCaja
         if (this.filtroSexoCaja) params.sexo = this.filtroSexoCaja
-        const res = await api.get('cajas/', { params })
         if (this.filtroUbicacion) params.idubicacion = this.filtroUbicacion
+        const res = await api.get('cajas/', { params })
         this.cajas = res.data.results ?? res.data
         this.cajasTotalPages = res.data.total_pages ?? 1
         this.cajasTotal = res.data.count ?? this.cajas.length
@@ -475,32 +637,6 @@ export default {
         }
       this.modalCaja = true
     },
-    async guardarRata() {
-      this.saving = true; this.errorModal = null; this.errorIdRata = null
-      try {
-        const payload = {
-          sexo: this.formRata.sexo,
-          numerocola: this.formRata.numerocola,
-          idcaja: this.formRata.idcaja || null,
-        }
-        if (this.formRata.idrata) payload.idrata = this.formRata.idrata
-        if (this.formRata.idcondicion) payload.idcondicion = this.formRata.idcondicion
-        if (this.formRata.fechacirugia) payload.fechacirugia = this.formRata.fechacirugia
-
-        if (this.editandoRata) await api.put(`ratas/${this.formRata.id}/`, payload)
-        else await api.post('ratas/', payload)
-        this.modalRata = false
-        await this.fetchRatas()
-        this.$toast.success(this.editandoRata ? 'Rata actualizada.' : 'Rata registrada.')
-      } catch (err) {
-        const data = err.response?.data
-        if (data?.idrata) {
-          this.errorIdRata = Array.isArray(data.idrata) ? data.idrata[0] : data.idrata
-        } else {
-          this.errorModal = this._parseError(err, 'Error al guardar la rata.')
-        }
-      } finally { this.saving = false }
-    },
 
     async guardarCaja() {
       this.saving = true; this.errorModal = null
@@ -511,7 +647,7 @@ export default {
         await this.fetchCajas()
         this.$toast.success(this.editandoCaja ? 'Caja actualizada.' : 'Caja registrada.')
       } catch (err) {
-        this.errorModal = this._parseError(err, 'Error al guardar la caja.')
+        this._showError(this._parseError(err, 'Error al guardar la caja.'))
       } finally { this.saving = false }
     },
 
@@ -521,16 +657,20 @@ export default {
         'Eliminar caja'
       )
       if (!ok) return
+      this.removingCajaId = c.idcaja
       try {
         await api.delete(`cajas/${c.idcaja}/`)
-        await this.fetchCajas()
-        this.$toast.success('Caja eliminada.')
+        setTimeout(async () => {
+          await this.fetchCajas()
+          this.removingCajaId = null
+          this.$toast.success('Caja eliminada.')
+        }, 320)
       } catch {
+        this.removingCajaId = null
         this.$toast.error('No se pudo eliminar la caja.')
       }
     },
 
-    // ── Ratas ──────────────────────────────────────────────────
     async fetchRatas() {
       this.loadingRatas = true
       this.errorRatas = null
@@ -565,7 +705,6 @@ export default {
       this.editandoRata = !!r
       if (r) {
         this.formRata = {
-          // id es la PK interna usada para PUT/DELETE
           id: r.id,
           idrata: r.idrata, sexo: r.sexo, numerocola: r.numerocola,
           idcaja: Number(r.caja_info?.idcaja) || null,
@@ -588,7 +727,6 @@ export default {
       try {
         const r = await api.get('ratas/siguiente_id/', { params: { sexo: this.formRata.sexo } })
         this.siguienteId = r.data.siguiente_id
-        // Si es nuevo registro y no tiene ID manual, preasignar el automático
         if (!this.editandoRata) {
           this.formRata.idrata = this.siguienteId
         }
@@ -619,7 +757,7 @@ export default {
         if (data?.idrata) {
           this.errorIdRata = Array.isArray(data.idrata) ? data.idrata[0] : data.idrata
         } else {
-          this.errorModal = this._parseError(err, 'Error al guardar la rata.')
+          this._showError(this._parseError(err, 'Error al guardar la rata.'))
         }
       } finally { this.saving = false }
     },
@@ -630,21 +768,24 @@ export default {
         'Eliminar rata'
       )
       if (!ok) return
+      this.removingRataId = r.id
       try {
         await api.delete(`ratas/${r.id}/`)
-        await this.fetchRatas()
-        this.$toast.success('Rata eliminada.')
+        setTimeout(async () => {
+          await this.fetchRatas()
+          this.removingRataId = null
+          this.$toast.success('Rata eliminada.')
+        }, 320)
       } catch {
+        this.removingRataId = null
         this.$toast.error('No se pudo eliminar la rata.')
       }
     },
 
-    // ── Helpers ────────────────────────────────────────────────
-
     fmtShort(d) {
       if (!d) return ''
       const [y, m, day] = d.split('-')
-      return `${day}/${m}`   // solo día/mes para no ocupar espacio
+      return `${day}/${m}`
     },
     fmt(d) {
       if (!d) return '—'
@@ -662,7 +803,6 @@ export default {
         return fallback
       }
 
-      // Si la respuesta es HTML (error no controlado de Django)
       if (typeof data === 'string' && data.includes('<')) {
         console.error('Server HTML response:', data)
         if (status === 500) return 'Error interno del servidor. Por favor, intenta nuevamente.'
@@ -670,19 +810,13 @@ export default {
         return fallback
       }
 
-      // Si es string de error directo
       if (typeof data === 'string') return data
 
-      // Si es objeto con errores de validación
       if (typeof data === 'object') {
-        // Buscar campo 'detail' (errores de permisos/autenticación)
         if (data.detail) return Array.isArray(data.detail) ? data.detail[0] : data.detail
-
-        // Buscar campo 'error' o 'message'
         if (data.error) return data.error
         if (data.message) return data.message
 
-        // Si hay errores de validación por campo, mostrar el primero
         const firstError = Object.entries(data)[0]
         if (firstError) {
           const [key, value] = firstError
@@ -737,6 +871,7 @@ export default {
         this.$toast.warning('Completa la fecha y el peso.')
         return
       }
+      this.guardandoPeso = true
       try {
         await api.post('pesos/', {
           idrata: this.rataSeleccionada.id,
@@ -745,7 +880,6 @@ export default {
           notas: this.formPeso.notas || null,
         })
         this.$toast.success('Peso registrado.')
-        // Recargar historial
         const res = await api.get('pesos/', {
           params: { idrata: this.rataSeleccionada.id, page_size: 100 }
         })
@@ -754,17 +888,25 @@ export default {
         this.formPeso.notas = ''
         await this.fetchRatas()
       } catch { this.$toast.error('Error al registrar el peso.') }
+      finally { this.guardandoPeso = false }
     },
 
     async eliminarPeso(p) {
       const ok = await this.$confirm(`¿Eliminar el registro del ${p.fecha}?`, 'Eliminar peso')
       if (!ok) return
+      this.removingPesoId = p.id
       try {
         await api.delete(`pesos/${p.id}/`)
-        this.historialPesos = this.historialPesos.filter(x => x.id !== p.id)
-        this.$toast.success('Registro eliminado.')
-        await this.fetchRatas()
-      } catch { this.$toast.error('No se pudo eliminar.') }
+        setTimeout(async () => {
+          this.historialPesos = this.historialPesos.filter(x => x.id !== p.id)
+          this.removingPesoId = null
+          this.$toast.success('Registro eliminado.')
+          await this.fetchRatas()
+        }, 320)
+      } catch {
+        this.removingPesoId = null
+        this.$toast.error('No se pudo eliminar.')
+      }
     },
 
     pesoTendencia(index) {
@@ -793,38 +935,268 @@ export default {
   padding: 2rem 1.5rem;
 }
 
+/* ════════════════════════════════════
+   TABS DE SELECCIÓN
+   ════════════════════════════════════ */
+.inv-tabs-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.inv-tabs {
+  display: flex;
+  gap: .5rem;
+  background: #f0f0f5;
+  padding: 5px;
+  border-radius: 12px;
+}
+
+.inv-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: .5rem 1.1rem;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  font-size: .86rem;
+  font-weight: 500;
+  color: #888;
+  cursor: pointer;
+  font-family: inherit;
+  position: relative;
+  /* transición suave de color y elevación */
+  transition: color .2s ease, background .2s ease,
+              transform .22s cubic-bezier(.22,.68,0,1.3),
+              box-shadow .22s ease;
+  user-select: none;
+}
+
+.inv-tab:hover:not(.inv-tab--active) {
+  color: #555;
+  background: rgba(255,255,255,.6);
+}
+
+/* Tab activo: fondo blanco, levemente levantado */
+.inv-tab--active {
+  background: #fff;
+  color: #80201d;
+  font-weight: 600;
+  /* Elevación — se levanta 3px y adquiere una sombra suave */
+  transform: translateY(-3px);
+  box-shadow:
+    0 4px 12px rgba(128,32,29,.18),
+    0 1px 3px rgba(0,0,0,.08);
+}
+
+/* Pequeño punto de acento debajo del tab activo */
+.inv-tab--active::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  background: #80201d;
+  border-radius: 50%;
+  animation: dotPop .25s cubic-bezier(.22,.68,0,1.4) both;
+}
+
+@keyframes dotPop {
+  from { transform: translateX(-50%) scale(0); }
+  to   { transform: translateX(-50%) scale(1); }
+}
+
+.inv-tabs-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ════════════════════════════════════
+   ANIMACIÓN DE SECCIÓN AL CAMBIAR TAB
+   (desvanecimiento + deslizamiento hacia abajo)
+   ════════════════════════════════════ */
+.tab-section-enter-active {
+  transition: opacity .28s ease, transform .28s ease;
+}
+
+.tab-section-leave-active {
+  transition: opacity .2s ease, transform .2s ease;
+}
+
+.tab-section-enter-from {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+.tab-section-leave-to {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+/* Separador visual entre secciones cuando están ambas visibles */
+.inv-section + .inv-section {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1.5px solid #f0f0f4;
+}
+
 .peso-form {
   background: #f8f8fb;
   border-radius: 10px;
   padding: 1rem 1.25rem;
   margin-bottom: 1.25rem;
   border: .5px solid #e0e0e0;
+  animation: fadeSlideUp .3s ease both;
 }
 
-.peso-historial {
-  margin-top: .5rem;
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.peso-historial { margin-top: .5rem; }
+
+/* ── Gráfica de tendencia de peso ── */
+.peso-chart-card {
+  background: #fafafd;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 1rem 1.1rem .75rem;
+  margin-bottom: 1.1rem;
+  animation: fadeSlideUp .3s ease both;
+}
+
+.peso-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: .6rem;
+}
+
+.peso-chart-title {
+  font-size: .82rem;
+  font-weight: 600;
+  color: #555;
+}
+
+.peso-trend-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: .76rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 99px;
+}
+
+.trend-up   { color: #2e7d32; background: #e8f5e9; }
+.trend-down { color: #c62828; background: #ffebee; }
+.trend-neutral { color: #757575; background: #f0f0f0; }
+
+.peso-chart-svg {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 320 / 110;
+  display: block;
+  overflow: visible;
+}
+
+.peso-chart-grid {
+  stroke: #eee;
+  stroke-width: 1;
+}
+
+.peso-chart-area {
+  fill-opacity: .12;
+  stroke: none;
+}
+.peso-chart-area.trend-up      { fill: #2e7d32; }
+.peso-chart-area.trend-down    { fill: #c62828; }
+.peso-chart-area.trend-neutral { fill: #757575; }
+
+.peso-chart-line {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: drawLine .8s ease both;
+}
+.peso-chart-line.trend-up      { stroke: #2e7d32; }
+.peso-chart-line.trend-down    { stroke: #c62828; }
+.peso-chart-line.trend-neutral { stroke: #757575; }
+
+@keyframes drawLine {
+  from { stroke-dasharray: 600; stroke-dashoffset: 600; }
+  to   { stroke-dasharray: 600; stroke-dashoffset: 0; }
+}
+
+.peso-chart-dot {
+  stroke: #fff;
+  stroke-width: 1.5;
+  transition: r .15s;
+}
+.peso-chart-dot.trend-up      { fill: #2e7d32; }
+.peso-chart-dot.trend-down    { fill: #c62828; }
+.peso-chart-dot.trend-neutral { fill: #757575; }
+.peso-chart-dot:hover { r: 5; }
+
+.peso-chart-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: .7rem;
+  color: #aaa;
+  margin-top: .3rem;
+}
+
+.peso-chart-hint {
+  text-align: center;
+  font-size: .82rem;
+  color: #aaa;
+  padding: 1rem;
+  background: #fafafd;
+  border-radius: 10px;
+  margin-bottom: 1rem;
 }
 
 .tend {
   font-size: 1rem;
   font-weight: 600;
+  display: inline-block;
 }
 
-.tend-up {
-  color: #2e7d32;
+.tend-up   { color: #2e7d32; animation: tendBounceUp .4s ease; }
+.tend-down { color: #c62828; animation: tendBounceDown .4s ease; }
+
+@keyframes tendBounceUp {
+  0%   { transform: translateY(4px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+@keyframes tendBounceDown {
+  0%   { transform: translateY(-4px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
 }
 
-.tend-down {
-  color: #c62828;
-}
-
-.tend-eq {
-  color: #888;
-}
+.tend-eq { color: #888; }
 
 .peso-fecha {
   font-size: .72rem;
   color: #aaa;
   margin-left: 4px;
+}
+
+.skeleton-table { padding: .5rem 0; }
+.skeleton-table .skeleton-row { border-bottom: 1px solid #f3f3f6; }
+
+@media (max-width: 640px) {
+  .content { padding: 1rem .85rem; }
+  .skeleton-row { padding: .6rem .75rem; gap: .6rem; }
+  .skeleton-cell--lg { display: none; }
 }
 </style>

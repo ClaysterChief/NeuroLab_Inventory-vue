@@ -324,10 +324,9 @@
     border-radius: 14px;
     padding: 2rem;
     width: 100%;
-    max-width: 480px;
+    max-width: 520px;
     max-height: 90vh;
     overflow-y: auto;
-    overflow-x: hidden;
 }
 
 .modal--wide {
@@ -460,10 +459,16 @@
 .id-row {
     display: flex;
     gap: 6px;
+    flex-wrap: wrap;
 }
 
 .id-row input {
     flex: 1;
+    min-width: 120px;
+}
+
+.id-row .btn-auto {
+    flex-shrink: 0;
 }
 
 .input-readonly {
@@ -546,4 +551,498 @@
     font-weight: 600;
     color: #1a1a2e;
     margin: 0;
+}
+
+/* ══════════════════════════════════════════════════════
+   ANIMACIONES GLOBALES
+   ══════════════════════════════════════════════════════ */
+
+@keyframes fadeSlideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes popIn {
+    0%   { opacity: 0; transform: scale(.9); }
+    70%  { transform: scale(1.03); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+/* Page header */
+.page-header {
+    animation: fadeSlideUp .3s ease both;
+}
+
+/* Tabla */
+.table-card {
+    animation: fadeSlideUp .35s ease .05s both;
+    transition: box-shadow .2s;
+}
+
+.table-card:hover {
+    box-shadow: 0 4px 20px rgba(0,0,0,.06);
+}
+
+/* Filas de tabla con stagger */
+.data-table tbody tr {
+    animation: fadeIn .25s ease both;
+    transition: background .12s;
+}
+
+.data-table tbody tr:nth-child(1)  { animation-delay: .04s; }
+.data-table tbody tr:nth-child(2)  { animation-delay: .07s; }
+.data-table tbody tr:nth-child(3)  { animation-delay: .10s; }
+.data-table tbody tr:nth-child(4)  { animation-delay: .13s; }
+.data-table tbody tr:nth-child(5)  { animation-delay: .16s; }
+.data-table tbody tr:nth-child(6)  { animation-delay: .19s; }
+.data-table tbody tr:nth-child(n+7){ animation-delay: .22s; }
+
+/* Modal overlay */
+.modal-overlay {
+    animation: fadeIn .2s ease both;
+}
+
+.modal {
+    animation: popIn .3s cubic-bezier(.22,.68,0,1.2) both;
+}
+
+/* Botones globales con microinteracciones */
+.btn-primary {
+    transition: background .18s, transform .12s, box-shadow .18s;
+}
+.btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(128,32,29,.28);
+}
+.btn-primary:active:not(:disabled) {
+    transform: translateY(0) scale(.97);
+    box-shadow: none;
+}
+
+.btn-secondary, .btn-outline {
+    transition: background .15s, transform .12s, border-color .15s;
+}
+.btn-secondary:active, .btn-outline:active {
+    transform: scale(.96);
+}
+
+.btn-icon {
+    transition: background .15s, transform .12s;
+}
+.btn-icon:active {
+    transform: scale(.88);
+}
+
+/* Inputs con transición de focus */
+input, select, textarea {
+    transition: border-color .18s, box-shadow .18s;
+}
+input:focus, select:focus, textarea:focus {
+    box-shadow: 0 0 0 3px rgba(128,32,29,.1);
+}
+
+/* Filtros bar */
+.filters-bar {
+    animation: fadeSlideUp .3s ease .08s both;
+}
+
+/* Badge microanimación */
+.badge {
+    transition: transform .12s;
+}
+.badge:hover {
+    transform: scale(1.08);
+}
+
+/* Paginación */
+.pagination-bar button {
+    transition: border-color .15s, color .15s, background .15s, transform .1s;
+}
+.pagination-bar button:active:not(:disabled) {
+    transform: scale(.93);
+}
+
+/* Tabs */
+.tab {
+    transition: color .15s, border-color .15s, background .15s;
+}
+.tab:hover {
+    background: rgba(128,32,29,.05);
+}
+
+/* Section divider */
+.section-divider {
+    background: linear-gradient(90deg, transparent, #e0e0e0 20%, #e0e0e0 80%, transparent);
+}
+
+
+/* ══════════════════════════════════════════════════════
+   RESPONSIVIDAD GLOBAL
+   ══════════════════════════════════════════════════════ */
+
+/* ── Tablet (≤ 900px) ── */
+@media (max-width: 900px) {
+    .content, .content--wide {
+        padding: 1.5rem 1.1rem;
+    }
+
+    .page-header h1 {
+        font-size: 1.25rem;
+    }
+
+    /* Modal más ancho en tablet */
+    .modal {
+        max-width: 95vw;
+    }
+
+    /* Grid de campos: 1 columna en modal */
+    .fields-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .field-full {
+        grid-column: 1;
+    }
+}
+
+/* ── Móvil (≤ 640px) ── */
+@media (max-width: 640px) {
+    .content, .content--narrow, .content--wide {
+        padding: 1rem .85rem;
+    }
+
+    /* Page header apilado */
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: .75rem;
+    }
+
+    .page-header h1 {
+        font-size: 1.15rem;
+    }
+
+    /* Botones en el header en fila compacta */
+    .page-header > div {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .btn-primary, .btn-secondary, .btn-outline {
+        font-size: .82rem;
+        padding: .48rem .9rem;
+    }
+
+    /* Filtros apilados */
+    .filters-bar {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .search-input, .filter-select {
+        width: 100%;
+    }
+
+    /* Tabla: scroll horizontal suave */
+    .table-card {
+        border-radius: 10px;
+    }
+
+    /* Tabla: columnas menos relevantes se ocultan */
+    .data-table th,
+    .data-table td {
+        padding: .55rem .7rem;
+        font-size: .8rem;
+    }
+
+    /* Tabs */
+    .tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        gap: 0;
+        padding-bottom: 1px;
+    }
+
+    .tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .tab {
+        font-size: .82rem;
+        padding: .5rem .95rem;
+        white-space: nowrap;
+    }
+
+    /* Modal en móvil */
+    .modal-overlay {
+        align-items: flex-end; /* sheet desde abajo */
+        padding: 0;
+    }
+
+    .modal {
+        border-radius: 16px 16px 0 0;
+        max-width: 100%;
+        max-height: 92vh;
+        padding: 1.5rem 1.1rem 2rem;
+    }
+
+    .modal h2 {
+        font-size: 1rem;
+        margin-bottom: 1.1rem;
+    }
+
+    .modal-actions {
+        flex-direction: column-reverse;
+        gap: 8px;
+    }
+
+    .modal-actions button {
+        width: 100%;
+    }
+
+    /* Tabla header apilado */
+    .tabla-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: .65rem;
+    }
+
+    .tabla-header button {
+        width: 100%;
+    }
+
+    /* Paginación */
+    .pagination-bar {
+        flex-wrap: wrap;
+        gap: 8px;
+        font-size: .78rem;
+    }
+
+    /* Actions inline */
+    .actions {
+        gap: 2px;
+    }
+
+    .btn-icon {
+        font-size: .88rem;
+        padding: 3px 5px;
+    }
+}
+
+/* ── Móvil pequeño (≤ 380px) ── */
+@media (max-width: 380px) {
+    .content, .content--narrow, .content--wide {
+        padding: .85rem .7rem;
+    }
+
+    .page-header h1 {
+        font-size: 1rem;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: .45rem .55rem;
+        font-size: .75rem;
+    }
+}
+
+
+/* ══════════════════════════════════════════════════════
+   UTILIDADES REUTILIZABLES — Skeleton, Shake, Pop, etc.
+   ══════════════════════════════════════════════════════ */
+
+/* ── Skeleton loader con shimmer ── */
+.skeleton {
+    position: relative;
+    overflow: hidden;
+    background: #eceef2;
+    border-radius: 6px;
+}
+
+.skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255,255,255,.65),
+        transparent
+    );
+    animation: skeletonShimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeletonShimmer {
+    from { transform: translateX(-100%); }
+    to   { transform: translateX(100%); }
+}
+
+.skeleton-row {
+    display: flex;
+    gap: 1rem;
+    padding: .75rem 1rem;
+    align-items: center;
+}
+
+.skeleton-cell {
+    height: 14px;
+    border-radius: 4px;
+    flex: 1;
+}
+
+.skeleton-cell--sm { flex: 0 0 60px; }
+.skeleton-cell--md { flex: 0 0 110px; }
+.skeleton-cell--lg { flex: 2; }
+
+/* ── Shake (validación de errores) ── */
+@keyframes shakeError {
+    0%, 100% { transform: translateX(0); }
+    20%       { transform: translateX(-7px); }
+    40%       { transform: translateX(7px); }
+    60%       { transform: translateX(-5px); }
+    80%       { transform: translateX(5px); }
+}
+
+.shake-error {
+    animation: shakeError .4s ease both;
+}
+
+/* ── Pop de éxito (checkmark) ── */
+@keyframes successPop {
+    0%   { opacity: 0; transform: scale(.3) rotate(-15deg); }
+    55%  { transform: scale(1.15) rotate(5deg); }
+    100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
+.success-pop {
+    animation: successPop .45s cubic-bezier(.22,.68,0,1.3) both;
+}
+
+/* ── Spinner con rebote ── */
+@keyframes spinnerBounce {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.15); }
+}
+
+.spinner-bounce {
+    display: inline-block;
+    animation: spinnerBounce .6s ease-in-out infinite;
+}
+
+/* ── Fila eliminándose (fade + collapse) ── */
+@keyframes rowRemove {
+    0%   { opacity: 1; transform: scaleY(1); }
+    40%  { opacity: 0; }
+    100% { opacity: 0; transform: scaleY(0); max-height: 0; padding: 0; }
+}
+
+.row-removing {
+    animation: rowRemove .35s ease forwards;
+    transform-origin: top;
+    overflow: hidden;
+}
+
+/* ── Botón con "respiración" (idle breathing) ── */
+@keyframes breathe {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.025); }
+}
+
+.btn-breathe {
+    animation: breathe 2.6s ease-in-out infinite;
+}
+
+/* ── Badge de notificación con pulso ── */
+@keyframes badgePulse {
+    0%   { box-shadow: 0 0 0 0 rgba(128,32,29,.55); }
+    70%  { box-shadow: 0 0 0 7px rgba(128,32,29,0); }
+    100% { box-shadow: 0 0 0 0 rgba(128,32,29,0); }
+}
+
+.badge-pulse {
+    animation: badgePulse 1.8s ease-out infinite;
+}
+
+.notif-dot {
+    position: relative;
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #e53935;
+    margin-left: 5px;
+    animation: badgePulse 1.8s ease-out infinite;
+}
+
+/* ── Tab content slide ── */
+.tab-fade-enter-active,
+.tab-fade-leave-active {
+    transition: opacity .18s ease, transform .18s ease;
+}
+.tab-fade-enter-from {
+    opacity: 0;
+    transform: translateX(14px);
+}
+.tab-fade-leave-to {
+    opacity: 0;
+    transform: translateX(-10px);
+}
+
+/* ── Modal genérico mejorado (entrada/salida) ── */
+.modal-fade-enter-active { transition: opacity .2s ease; }
+.modal-fade-leave-active { transition: opacity .15s ease; }
+.modal-fade-enter-from,
+.modal-fade-leave-to { opacity: 0; }
+
+.modal-pop-enter-active { transition: transform .25s cubic-bezier(.22,.68,0,1.3), opacity .2s; }
+.modal-pop-leave-active { transition: transform .15s ease, opacity .15s; }
+.modal-pop-enter-from { opacity: 0; transform: scale(.92) translateY(10px); }
+.modal-pop-leave-to   { opacity: 0; transform: scale(.96); }
+
+/* ── Empty state con icono flotante ── */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    color: #bbb;
+}
+
+.empty-state-icon {
+    font-size: 2.5rem;
+    display: block;
+    margin-bottom: .6rem;
+    animation: floatGentle 3s ease-in-out infinite;
+    opacity: .5;
+}
+
+@keyframes floatGentle {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-8px); }
+}
+
+/* ── List transition genérica (TransitionGroup) ── */
+.list-enter-active {
+    transition: opacity .3s ease, transform .3s ease;
+}
+.list-leave-active {
+    transition: opacity .3s ease, transform .3s ease;
+    position: absolute;
+    width: 100%;
+}
+.list-enter-from {
+    opacity: 0;
+    transform: translateY(-10px);
+}
+.list-leave-to {
+    opacity: 0;
+    transform: translateX(30px);
+}
+.list-move {
+    transition: transform .3s ease;
 }

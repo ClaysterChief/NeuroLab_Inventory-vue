@@ -5,23 +5,31 @@
             <transition-group name="toast">
                 <div v-for="item in toastState.items" :key="item.id" class="toast" :class="`toast--${item.type}`"
                     @click="remove(item.id)">
-                    <span class="toast-icon">{{ icons[item.type] }}</span>
+                    <span class="toast-icon" :class="{ 'toast-icon--success': item.type === 'success' }">
+                        {{ icons[item.type] }}
+                    </span>
                     <span class="toast-msg">{{ item.message }}</span>
+                    <span class="toast-progress"></span>
                 </div>
             </transition-group>
         </div>
 
         <!-- Confirm Dialog -->
-        <div v-if="confirmState.visible" class="confirm-overlay" @click.self="confirmCancel">
-            <div class="confirm-box">
-                <h3 class="confirm-title">{{ confirmState.title }}</h3>
-                <p class="confirm-msg">{{ confirmState.message }}</p>
-                <div class="confirm-actions">
-                    <button class="btn-secondary" @click="confirmCancel">Cancelar</button>
-                    <button class="btn-primary" @click="confirmAccept">Confirmar</button>
-                </div>
+        <transition name="confirm-fade">
+            <div v-if="confirmState.visible" class="confirm-overlay" @click.self="confirmCancel">
+                <transition name="confirm-pop" appear>
+                    <div class="confirm-box" v-if="confirmState.visible">
+                        <span class="confirm-icon">⚠️</span>
+                        <h3 class="confirm-title">{{ confirmState.title }}</h3>
+                        <p class="confirm-msg">{{ confirmState.message }}</p>
+                        <div class="confirm-actions">
+                            <button class="btn-secondary" @click="confirmCancel">Cancelar</button>
+                            <button class="btn-primary" @click="confirmAccept">Confirmar</button>
+                        </div>
+                    </div>
+                </transition>
             </div>
-        </div>
+        </transition>
     </teleport>
 </template>
 
@@ -73,6 +81,14 @@ export default {
     cursor: pointer;
     min-width: 240px;
     max-width: 360px;
+    position: relative;
+    overflow: hidden;
+    transition: transform .15s, box-shadow .15s;
+}
+
+.toast:hover {
+    transform: translateX(-3px);
+    box-shadow: 0 6px 20px rgba(0,0,0,.2);
 }
 
 .toast--success {
@@ -85,6 +101,13 @@ export default {
     background: #ffebee;
     color: #c62828;
     border-left: 4px solid #e53935;
+    animation: toastShake .4s ease;
+}
+
+@keyframes toastShake {
+    0%, 100% { transform: translateX(0); }
+    25%       { transform: translateX(-4px); }
+    75%       { transform: translateX(4px); }
 }
 
 .toast--info {
@@ -104,27 +127,57 @@ export default {
     flex-shrink: 0;
 }
 
+.toast-icon--success {
+    animation: successPop .4s cubic-bezier(.22,.68,0,1.3) both;
+}
+
+@keyframes successPop {
+    0%   { transform: scale(.3) rotate(-15deg); opacity: 0; }
+    60%  { transform: scale(1.2) rotate(8deg); }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
 .toast-msg {
     line-height: 1.4;
 }
 
-/* ── Animación ── */
+/* Barra de progreso indicando autodesaparición */
+.toast-progress {
+    position: absolute;
+    bottom: 0; left: 0;
+    height: 2.5px;
+    background: currentColor;
+    opacity: .35;
+    animation: toastProgress 3.5s linear forwards;
+}
+
+@keyframes toastProgress {
+    from { width: 100%; }
+    to   { width: 0%; }
+}
+
+/* ── Animación entrada/salida ── */
 .toast-enter-active {
-    transition: all .28s ease;
+    transition: all .3s cubic-bezier(.22,.68,0,1.2);
 }
 
 .toast-leave-active {
     transition: all .22s ease;
+    position: absolute;
+}
+
+.toast-move {
+    transition: transform .25s ease;
 }
 
 .toast-enter-from {
     opacity: 0;
-    transform: translateX(30px);
+    transform: translateX(40px) scale(.9);
 }
 
 .toast-leave-to {
     opacity: 0;
-    transform: translateX(30px);
+    transform: translateX(40px) scale(.9);
 }
 
 /* ── Confirm ── */
@@ -138,6 +191,25 @@ export default {
     z-index: 9998;
 }
 
+.confirm-fade-enter-active { transition: opacity .2s ease; }
+.confirm-fade-leave-active { transition: opacity .15s ease; }
+.confirm-fade-enter-from, .confirm-fade-leave-to { opacity: 0; }
+
+.confirm-pop-enter-active {
+    transition: transform .28s cubic-bezier(.22,.68,0,1.3), opacity .22s;
+}
+.confirm-pop-leave-active {
+    transition: transform .15s ease, opacity .15s;
+}
+.confirm-pop-enter-from {
+    opacity: 0;
+    transform: scale(.85) translateY(14px);
+}
+.confirm-pop-leave-to {
+    opacity: 0;
+    transform: scale(.92);
+}
+
 .confirm-box {
     background: #fff;
     border-radius: 14px;
@@ -145,6 +217,20 @@ export default {
     max-width: 380px;
     width: 90%;
     box-shadow: 0 8px 32px rgba(0, 0, 0, .15);
+    text-align: center;
+}
+
+.confirm-icon {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: .6rem;
+    animation: confirmIconWiggle .5s ease .1s both;
+}
+
+@keyframes confirmIconWiggle {
+    0%   { transform: scale(0) rotate(-20deg); opacity: 0; }
+    60%  { transform: scale(1.15) rotate(8deg); }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
 }
 
 .confirm-title {
@@ -163,7 +249,30 @@ export default {
 
 .confirm-actions {
     display: flex;
-    justify-content: flex-end;
+    justify-content: center;
     gap: 10px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+    .toast-wrap {
+        bottom: 1rem;
+        right: 1rem;
+        left: 1rem;
+    }
+    .toast {
+        min-width: 0;
+        max-width: 100%;
+        width: 100%;
+    }
+    .confirm-box {
+        padding: 1.5rem 1.25rem;
+    }
+    .confirm-actions {
+        flex-direction: column-reverse;
+    }
+    .confirm-actions button {
+        width: 100%;
+    }
 }
 </style>

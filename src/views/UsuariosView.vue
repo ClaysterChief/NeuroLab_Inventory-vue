@@ -4,13 +4,22 @@
     <main class="content">
       <div class="page-header">
         <h1>Gestión de Usuarios</h1>
-        <button class="btn-primary" @click="openModal()">+ Nuevo usuario</button>
+        <button class="btn-primary btn-breathe" @click="openModal()">+ Nuevo usuario</button>
       </div>
 
       <!-- ── Tabla ────────────────────────────────────────── -->
       <div class="table-card">
-        <div v-if="loading" class="state-msg">Cargando usuarios…</div>
-        <div v-else-if="error" class="state-msg error">{{ error }}</div>
+        <div v-if="loading" class="skeleton-table">
+          <div class="skeleton-row" v-for="n in 5" :key="n">
+            <div class="skeleton skeleton-cell skeleton-cell--sm"></div>
+            <div class="skeleton skeleton-cell skeleton-cell--md"></div>
+            <div class="skeleton skeleton-cell skeleton-cell--md"></div>
+            <div class="skeleton skeleton-cell skeleton-cell--sm"></div>
+            <div class="skeleton skeleton-cell skeleton-cell--sm"></div>
+            <div class="skeleton skeleton-cell skeleton-cell--sm"></div>
+          </div>
+        </div>
+        <div v-else-if="error" class="state-msg error shake-error">{{ error }}</div>
         <table v-else class="data-table">
           <thead>
             <tr>
@@ -22,23 +31,24 @@
               <th>Acciones</th>
             </tr>
           </thead>
-          <tbody>
-            <tr v-for="u in usuarios" :key="u.idusuario">
+          <transition-group name="list" tag="tbody">
+            <tr v-for="u in usuarios" :key="u.idusuario" :class="{ 'row-removing': removingId === u.idusuario }">
               <td>{{ u.idusuario }}</td>
               <td>{{ u.nombreusuario }}</td>
               <td>{{ u.apellidopaterno }} {{ u.apellidomaterno }}</td>
               <td>{{ u.sexo }}</td>
-              <td><span class="role-chip">{{ u.rol_nombre }}</span></td>
+              <td><span class="role-chip" :class="'role-' + (u.rol_nombre || '').toLowerCase()">{{ u.rol_nombre }}</span></td>
               <td class="actions">
                 <button class="btn-icon" @click="openModal(u)" title="Editar">✏️</button>
                 <button class="btn-icon danger" @click="confirmDelete(u)" title="Eliminar">🗑️</button>
               </td>
             </tr>
-            <tr v-if="!usuarios.length">
-              <td colspan="6" class="empty-row">No hay usuarios registrados.</td>
-            </tr>
-          </tbody>
+          </transition-group>
         </table>
+        <div v-if="!loading && !error && !usuarios.length" class="empty-state">
+          <span class="empty-state-icon">👤</span>
+          No hay usuarios registrados.
+        </div>
         <div v-if="usuariosTotalPages > 1" class="pagination-bar">
           <button :disabled="usuariosPage === 1" @click="usuariosPage--; fetchUsuarios()">← Anterior</button>
           <span>Página {{ usuariosPage }} de {{ usuariosTotalPages }} · {{ usuariosTotal }} registros</span>
@@ -48,86 +58,91 @@
       </div>
 
       <!-- ── Modal ────────────────────────────────────────── -->
-      <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
-        <div class="modal">
-          <h2>{{ editando ? 'Editar usuario' : 'Nuevo usuario' }}</h2>
-          <form @submit.prevent="guardarUsuario">
-            <div class="fields-grid">
+      <transition name="modal-fade">
+        <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
+          <transition name="modal-pop" appear>
+            <div class="modal" v-if="showModal">
+              <h2>{{ editando ? 'Editar usuario' : 'Nuevo usuario' }}</h2>
+              <form @submit.prevent="guardarUsuario">
+                <div class="fields-grid">
 
-              <div class="field">
-                <label>Nombre de usuario <span class="req">*</span></label>
-                <input v-model="form.nombreusuario" required :disabled="editando"
-                  :class="{ 'input-error': fieldErrors.nombreusuario }" />
-                <span v-if="fieldErrors.nombreusuario" class="field-error">
-                  {{ fieldErrors.nombreusuario }}
-                </span>
-              </div>
+                  <div class="field">
+                    <label>Nombre de usuario <span class="req">*</span></label>
+                    <input v-model="form.nombreusuario" required :disabled="editando"
+                      :class="{ 'input-error shake-error': fieldErrors.nombreusuario }" />
+                    <span v-if="fieldErrors.nombreusuario" class="field-error">
+                      {{ fieldErrors.nombreusuario }}
+                    </span>
+                  </div>
 
-              <div class="field">
-                <label>
-                  Contraseña
-                  <span v-if="editando" class="label-hint">(vacío = sin cambios)</span>
-                  <span v-else class="req"> *</span>
-                </label>
-                <input v-model="form.password" type="password" :required="!editando" autocomplete="new-password"
-                  :class="{ 'input-error': fieldErrors.password }" />
-                <span v-if="fieldErrors.password" class="field-error">
-                  {{ fieldErrors.password }}
-                </span>
-              </div>
+                  <div class="field">
+                    <label>
+                      Contraseña
+                      <span v-if="editando" class="label-hint">(vacío = sin cambios)</span>
+                      <span v-else class="req"> *</span>
+                    </label>
+                    <input v-model="form.password" type="password" :required="!editando" autocomplete="new-password"
+                      :class="{ 'input-error shake-error': fieldErrors.password }" />
+                    <span v-if="fieldErrors.password" class="field-error">
+                      {{ fieldErrors.password }}
+                    </span>
+                  </div>
 
-              <div class="field">
-                <label>Confirmar contraseña</label>
-                <input v-model="form.password_confirm" type="password" :required="!editando || !!form.password"
-                  autocomplete="new-password" :class="{ 'input-error': fieldErrors.password_confirm }" />
-                <span v-if="fieldErrors.password_confirm" class="field-error">
-                  {{ fieldErrors.password_confirm }}
-                </span>
-              </div>
+                  <div class="field">
+                    <label>Confirmar contraseña</label>
+                    <input v-model="form.password_confirm" type="password" :required="!editando || !!form.password"
+                      autocomplete="new-password" :class="{ 'input-error shake-error': fieldErrors.password_confirm }" />
+                    <span v-if="fieldErrors.password_confirm" class="field-error">
+                      {{ fieldErrors.password_confirm }}
+                    </span>
+                  </div>
 
-              <div class="field">
-                <label>Apellido paterno <span class="req">*</span></label>
-                <input v-model="form.apellidopaterno" required />
-              </div>
+                  <div class="field">
+                    <label>Apellido paterno <span class="req">*</span></label>
+                    <input v-model="form.apellidopaterno" required />
+                  </div>
 
-              <div class="field">
-                <label>Apellido materno <span class="req">*</span></label>
-                <input v-model="form.apellidomaterno" required />
-              </div>
+                  <div class="field">
+                    <label>Apellido materno <span class="req">*</span></label>
+                    <input v-model="form.apellidomaterno" required />
+                  </div>
 
-              <div class="field">
-                <label>Sexo <span class="req">*</span></label>
-                <select v-model="form.sexo" required>
-                  <option value="">Seleccionar…</option>
-                  <option value="Masculino">Masculino</option>
-                  <option value="Femenino">Femenino</option>
-                </select>
-              </div>
+                  <div class="field">
+                    <label>Sexo <span class="req">*</span></label>
+                    <select v-model="form.sexo" required>
+                      <option value="">Seleccionar…</option>
+                      <option value="Masculino">Masculino</option>
+                      <option value="Femenino">Femenino</option>
+                    </select>
+                  </div>
 
-              <div class="field">
-                <label>Rol <span class="req">*</span></label>
-                <select v-model="form.idrol" required>
-                  <option value="">Seleccionar…</option>
-                  <option v-for="r in roles" :key="r.idrol" :value="r.idrol">
-                    {{ r.nombrerol }}
-                  </option>
-                </select>
-                <span v-if="fieldErrors.idrol" class="field-error">{{ fieldErrors.idrol }}</span>
-              </div>
+                  <div class="field">
+                    <label>Rol <span class="req">*</span></label>
+                    <select v-model="form.idrol" required>
+                      <option value="">Seleccionar…</option>
+                      <option v-for="r in roles" :key="r.idrol" :value="r.idrol">
+                        {{ r.nombrerol }}
+                      </option>
+                    </select>
+                    <span v-if="fieldErrors.idrol" class="field-error">{{ fieldErrors.idrol }}</span>
+                  </div>
 
+                </div>
+
+                <p v-if="formError" class="form-error shake-error" :key="formErrorKey">{{ formError }}</p>
+
+                <div class="modal-actions">
+                  <button type="button" class="btn-secondary" @click="closeModal">Cancelar</button>
+                  <button type="submit" class="btn-primary" :disabled="saving">
+                    <span v-if="saving" class="spinner-bounce">⏳</span>
+                    <span v-else>Guardar</span>
+                  </button>
+                </div>
+              </form>
             </div>
-
-            <p v-if="formError" class="form-error">{{ formError }}</p>
-
-            <div class="modal-actions">
-              <button type="button" class="btn-secondary" @click="closeModal">Cancelar</button>
-              <button type="submit" class="btn-primary" :disabled="saving">
-                {{ saving ? 'Guardando…' : 'Guardar' }}
-              </button>
-            </div>
-          </form>
+          </transition>
         </div>
-      </div>
+      </transition>
 
     </main>
   </div>
@@ -150,6 +165,7 @@ export default {
       editando: false,
       saving: false,
       formError: null,
+      formErrorKey: 0,
       fieldErrors: {},
       form: {
         nombreusuario: '',
@@ -163,12 +179,18 @@ export default {
       usuariosPage: 1,
       usuariosTotalPages: 1,
       usuariosTotal: 0,
+      removingId: null,
     }
   },
   async created() {
     await Promise.all([this.fetchUsuarios(), this.fetchRoles()])
   },
   methods: {
+    _showFormError(msg) {
+      this.formError = msg
+      this.formErrorKey++
+    },
+
     async fetchUsuarios() {
       this.loading = true
       this.error = null
@@ -249,12 +271,12 @@ export default {
         if (data && typeof data === 'object') {
           this.fieldErrors = data
           if (data.non_field_errors) {
-            this.formError = Array.isArray(data.non_field_errors)
+            this._showFormError(Array.isArray(data.non_field_errors)
               ? data.non_field_errors.join(' ')
-              : data.non_field_errors
+              : data.non_field_errors)
           }
         } else {
-          this.formError = 'Error al guardar. Verifica los datos.'
+          this._showFormError('Error al guardar. Verifica los datos.')
         }
       } finally { this.saving = false }
     },
@@ -265,11 +287,16 @@ export default {
         'Eliminar usuario'
       )
       if (!ok) return
+      this.removingId = u.idusuario
       try {
         await api.delete(`usuarios/${u.idusuario}/`)
-        await this.fetchUsuarios()
-        this.$toast.success('Usuario eliminado.')
+        setTimeout(async () => {
+          await this.fetchUsuarios()
+          this.removingId = null
+          this.$toast.success('Usuario eliminado.')
+        }, 320)
       } catch {
+        this.removingId = null
         this.$toast.error('No se pudo eliminar el usuario.')
       }
     },
@@ -282,5 +309,20 @@ export default {
   max-width: 1000px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
+}
+
+.skeleton-table { padding: .5rem 0; }
+.skeleton-table .skeleton-row { border-bottom: 1px solid #f3f3f6; }
+
+/* Role chip con colores según rol */
+.role-chip {
+  transition: transform .15s;
+}
+.role-administrador { background: #fde7e7; color: #c62828; }
+.role-encargado      { background: #e3f2fd; color: #1565c0; }
+.role-practicante    { background: #f3e5f5; color: #6a0dad; }
+
+@media (max-width: 640px) {
+  .content { padding: 1rem .85rem; }
 }
 </style>

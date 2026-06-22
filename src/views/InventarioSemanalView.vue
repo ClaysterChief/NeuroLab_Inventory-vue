@@ -27,6 +27,7 @@
             <div class="sw-pbar-fill" :style="{ width: progressPct + '%' }"></div>
         </div>
 
+        <transition name="step" mode="out-in">
         <!-- ══════════════════════════════════
          PASO: SETUP
     ══════════════════════════════════ -->
@@ -299,6 +300,7 @@
             </div>
         </div>
 
+        </transition>
     </div>
 </template>
 
@@ -561,7 +563,7 @@ export default {
                     // Quitar _temp_id antes de enviar
                     nuevas_ratas: this.sesion.nuevas_ratas.map(({ _temp_id, ...rest }) => rest),
                 }
-                const res = await api.post('/inventario/sesion/', payload)
+                const res = await api.post('inventario/sesion/', payload)
                 if (res.data.ok) {
                     localStorage.removeItem(this.lsKey)
                     this.paso = 'exito'
@@ -1259,18 +1261,476 @@ export default {
     margin-bottom: 1.5rem;
 }
 
-/* ── Responsive ── */
-@media (max-width: 480px) {
+/* ── Transición entre pasos ── */
+.step-enter-active,
+.step-leave-active {
+    transition: opacity .25s ease, transform .25s ease;
+}
+.step-enter-from {
+    opacity: 0;
+    transform: translateX(24px);
+}
+.step-leave-to {
+    opacity: 0;
+    transform: translateX(-18px);
+}
+
+/* ════════════════════════════════════════════════
+   ANIMACIONES
+   ════════════════════════════════════════════════ */
+
+/* Fade + slide general de cada paso */
+@keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes popIn {
+    0%   { opacity: 0; transform: scale(.88); }
+    70%  { transform: scale(1.04); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideRight {
+    from { opacity: 0; transform: translateX(-20px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes barFill {
+    from { width: 0%; }
+}
+
+@keyframes shimmer {
+    0%   { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    40%       { transform: translateY(-8px); }
+    60%       { transform: translateY(-4px); }
+}
+
+/* Aplicar fade al cambio de paso */
+.sw-page {
+    animation: fadeSlideIn .35s ease both;
+}
+
+/* Card de setup y éxito */
+.sw-card {
+    animation: popIn .4s cubic-bezier(.22,.68,0,1.2) both;
+}
+
+.sw-big-icon {
+    animation: bounce 1.2s ease 0.4s both;
+    display: inline-block;
+}
+
+/* Tiles de cajas — escalonados */
+.sw-tile {
+    animation: fadeSlideIn .3s ease both;
+}
+
+.sw-cajas-grid .sw-tile:nth-child(1)  { animation-delay: .05s; }
+.sw-cajas-grid .sw-tile:nth-child(2)  { animation-delay: .09s; }
+.sw-cajas-grid .sw-tile:nth-child(3)  { animation-delay: .13s; }
+.sw-cajas-grid .sw-tile:nth-child(4)  { animation-delay: .17s; }
+.sw-cajas-grid .sw-tile:nth-child(5)  { animation-delay: .21s; }
+.sw-cajas-grid .sw-tile:nth-child(6)  { animation-delay: .25s; }
+.sw-cajas-grid .sw-tile:nth-child(7)  { animation-delay: .29s; }
+.sw-cajas-grid .sw-tile:nth-child(8)  { animation-delay: .33s; }
+.sw-cajas-grid .sw-tile:nth-child(n+9){ animation-delay: .37s; }
+
+/* Tile hover más expresivo */
+.sw-tile {
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.sw-tile:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 6px 18px rgba(128,32,29,.14);
+}
+.sw-tile:active {
+    transform: scale(.97);
+}
+
+/* Filas de ratas */
+.sw-rata-row {
+    animation: slideRight .25s ease both;
+    transition: background .15s, opacity .2s;
+}
+
+/* Stats del resumen */
+.sw-stat-box {
+    animation: popIn .35s cubic-bezier(.22,.68,0,1.2) both;
+}
+.sw-stats-row .sw-stat-box:nth-child(1) { animation-delay: .05s; }
+.sw-stats-row .sw-stat-box:nth-child(2) { animation-delay: .12s; }
+.sw-stats-row .sw-stat-box:nth-child(3) { animation-delay: .19s; }
+.sw-stats-row .sw-stat-box:nth-child(4) { animation-delay: .26s; }
+
+/* Detalles del resumen */
+.sw-detalle {
+    animation: fadeSlideIn .3s ease both;
+}
+
+/* Barra de progreso animada */
+.sw-pbar-fill {
+    animation: barFill .5s ease both;
+}
+
+/* Botón primary — efecto ripple suave */
+.btn-primary {
+    position: relative;
+    overflow: hidden;
+    transition: background .2s, transform .12s, box-shadow .2s;
+}
+.btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(128,32,29,.3);
+}
+.btn-primary:active:not(:disabled) {
+    transform: translateY(0) scale(.97);
+}
+
+.btn-secondary {
+    transition: background .15s, transform .12s;
+}
+.btn-secondary:active { transform: scale(.96); }
+
+/* Ubicación card hover */
+.sw-ubic-card {
+    transition: border-color .15s, background .15s, transform .15s, box-shadow .15s;
+}
+.sw-ubic-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,.08);
+}
+.sw-ubic-card.active {
+    animation: popIn .25s ease both;
+}
+
+/* Formulario de nueva rata — fade in */
+.sw-form-nueva-rata {
+    animation: fadeSlideIn .22s ease both;
+}
+
+/* Input focus */
+.sw-inp-sm, .sw-input, .sw-textarea {
+    transition: border-color .18s, box-shadow .18s;
+}
+.sw-inp-sm:focus, .sw-input:focus, .sw-textarea:focus {
+    box-shadow: 0 0 0 3px rgba(128,32,29,.12);
+}
+
+/* Recovery box */
+.sw-recovery {
+    animation: fadeSlideIn .3s ease .1s both;
+}
+
+/* Error message shake */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%       { transform: translateX(-6px); }
+    40%       { transform: translateX(6px); }
+    60%       { transform: translateX(-4px); }
+    80%       { transform: translateX(4px); }
+}
+.sw-error-msg {
+    animation: shake .4s ease both;
+}
+
+/* Éxito stats — lista animada */
+.sw-exito-stats div {
+    animation: slideRight .3s ease both;
+}
+.sw-exito-stats div:nth-child(1) { animation-delay: .1s; }
+.sw-exito-stats div:nth-child(2) { animation-delay: .18s; }
+.sw-exito-stats div:nth-child(3) { animation-delay: .26s; }
+.sw-exito-stats div:nth-child(4) { animation-delay: .34s; }
+
+/* Top bar gradient animado */
+.sw-topbar {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    transition: box-shadow .2s;
+}
+
+/* Badge colores */
+.rat-badge {
+    transition: transform .15s;
+}
+.rat-badge:hover {
+    transform: scale(1.1);
+}
+
+
+/* ════════════════════════════════════════════════
+   RESPONSIVIDAD COMPLETA
+   ════════════════════════════════════════════════ */
+
+/* ── Tablet (≤ 768px) ── */
+@media (max-width: 768px) {
+    .sw-page {
+        padding: 1rem 1rem 5rem;
+    }
+
+    .sw-topbar {
+        padding: .55rem 1rem;
+        gap: .5rem;
+    }
+
+    .sw-tb-title {
+        font-size: .82rem;
+    }
+
+    .sw-tb-sub {
+        display: none; /* más espacio en tablet */
+    }
+
+    .sw-prog {
+        font-size: .72rem;
+    }
+
+    /* Grid de cajas: 3 columnas en tablet */
     .sw-cajas-grid {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(3, 1fr);
+        gap: .55rem;
+    }
+
+    .sw-tile {
+        padding: .75rem;
+    }
+
+    .sw-tile-num {
+        font-size: .8rem;
+    }
+
+    /* Stats */
+    .sw-stats-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sw-stat-val {
+        font-size: 1.3rem;
+    }
+
+    /* Caja individual */
+    .sw-caja-hdr {
+        flex-wrap: wrap;
+        gap: .5rem;
+    }
+
+    .sw-caja-num {
+        font-size: .9rem;
+    }
+
+    /* Ratas row en tablet */
+    .rr-info {
+        flex-wrap: wrap;
+        gap: .35rem;
+    }
+
+    .rr-actions {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .sw-inp-peso {
+        width: 100px;
+    }
+
+    /* Card de setup */
+    .sw-card {
+        padding: 1.75rem 1.5rem;
+    }
+}
+
+/* ── Móvil grande (≤ 580px) ── */
+@media (max-width: 580px) {
+    .sw-page {
+        padding: .85rem .85rem 5rem;
+    }
+
+    .sw-cajas-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: .5rem;
+    }
+
+    .sw-tile {
+        padding: .65rem .7rem;
+    }
+
+    .sw-tile-mid {
+        font-size: .7rem;
+    }
+
+    .sw-tile-status {
+        font-size: .67rem;
+    }
+
+    .sw-en-orden-btn {
+        font-size: .65rem;
+        padding: .18rem .4rem;
+    }
+
+    /* Footer de cajas */
+    .sw-cajas-footer {
+        flex-direction: column;
+        gap: .5rem;
+    }
+
+    .sw-cajas-footer button {
+        width: 100%;
+        text-align: center;
+    }
+
+    /* Resumen footer */
+    .sw-resumen-footer {
+        flex-direction: column-reverse;
+        gap: .5rem;
+    }
+
+    .sw-resumen-footer button {
+        width: 100%;
+    }
+
+    /* Caja footer */
+    .sw-caja-footer {
+        flex-direction: column-reverse;
+        gap: .5rem;
+    }
+
+    .sw-caja-footer button {
+        width: 100%;
+    }
+
+    /* Stats 2 columnas en móvil */
+    .sw-stats-row {
+        grid-template-columns: repeat(2, 1fr);
+        gap: .5rem;
+    }
+
+    .sw-stat-val {
+        font-size: 1.2rem;
+    }
+
+    .sw-stat-lbl {
+        font-size: .67rem;
+    }
+
+    /* Topbar en móvil */
+    .sw-tb-icon {
+        font-size: 1.1rem;
+    }
+
+    .sw-x-btn {
+        padding: .25rem .55rem;
+        font-size: .75rem;
+    }
+
+    /* Card de setup */
+    .sw-card {
+        padding: 1.5rem 1.1rem;
+        border-radius: 12px;
+    }
+
+    .sw-big-icon {
+        font-size: 2rem;
+    }
+
+    .sw-card-h {
+        font-size: 1.05rem;
     }
 
     .sw-ubic-grid {
         grid-template-columns: 1fr;
     }
 
+    /* Rata row en móvil: stack vertical */
+    .sw-rata-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: .5rem;
+        padding: .7rem .75rem;
+    }
+
+    .rr-actions {
+        width: 100%;
+        gap: .4rem;
+    }
+
+    .sw-inp-peso {
+        flex: 1;
+        min-width: 80px;
+    }
+
+    .sw-inp-nota {
+        flex: 2;
+    }
+
+    /* Sección head */
+    .sw-sec-head {
+        margin-bottom: .85rem;
+    }
+
+    .sw-sec-title {
+        font-size: .97rem;
+    }
+
+    /* Header de caja individual */
+    .sw-caja-hdr {
+        align-items: flex-start;
+    }
+
+    .sw-en-orden-sm {
+        font-size: .72rem;
+        padding: .25rem .55rem;
+    }
+
+    /* Form nueva rata en móvil */
+    .sw-form-nueva-rata {
+        flex-direction: column;
+        gap: .5rem;
+    }
+
+    .sw-form-nueva-rata select,
+    .sw-form-nueva-rata input {
+        width: 100%;
+    }
+
+    /* Detalles del resumen */
+    .sw-det-item {
+        font-size: .78rem;
+    }
+}
+
+/* ── Móvil pequeño (≤ 360px) ── */
+@media (max-width: 360px) {
+    .sw-cajas-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: .4rem;
+    }
+
+    .sw-tile {
+        padding: .55rem .6rem;
+    }
+
+    .sw-tile-num {
+        font-size: .74rem;
+    }
+
+    .sw-stats-row {
+        grid-template-columns: 1fr 1fr;
+    }
+
     .sw-topbar {
-        padding: .6rem 1rem;
+        flex-wrap: wrap;
+        height: auto;
+        padding: .5rem .85rem;
     }
 }
 </style>
